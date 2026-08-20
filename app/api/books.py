@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Literal, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlmodel import Session, select
 from app.database import get_session
@@ -16,22 +16,32 @@ from app.services import book_service
 
 router = APIRouter(prefix="/books", tags=["Books"])
 
+CatalogStatus = Literal["available", "reading", "finished"]
+
 
 @router.get("", response_model=list[BookRead])
 def list_books(
-    q: Optional[str] = Query(None, description="Search keyword in title, author, summary, or ISBN"),
+    q: Optional[str] = Query(None, description="Search keyword in title, author, summary, ISBN, or tags"),
     genre: Optional[str] = Query(None, description="Filter by genre or tag"),
     room: Optional[str] = Query(None, description="Filter by location room"),
+    book_format: Optional[str] = Query(None, alias="format", description="Filter by format"),
+    reading_status: Optional[CatalogStatus] = Query(
+        None,
+        alias="status",
+        description="Filter by derived reading status: available, reading, or finished",
+    ),
     offset: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=500),
     session: Session = Depends(get_session),
 ) -> list[BookRead]:
-    """Retrieve list of books matching search/filter criteria."""
+    """Retrieve list of books matching search/filter criteria. Filters combine with AND."""
     return book_service.list_books(
         session=session,
         query=q,
         genre=genre,
         room=room,
+        book_format=book_format,
+        status=reading_status,
         offset=offset,
         limit=limit,
     )

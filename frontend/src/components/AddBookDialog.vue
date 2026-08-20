@@ -71,7 +71,7 @@
         </v-window-item>
 
         <!-- Manual Form Tab (Shared for submission) -->
-        <v-window-item value="manual">
+        <v-window-item value="manual" eager>
           <v-card-text class="pt-4">
             <v-form ref="formRef" v-model="isFormValid">
               <v-row density="compact">
@@ -170,7 +170,7 @@
                   <v-select
                     v-model="form.formats"
                     label="Format"
-                    :items="['physical', 'pdf', 'epub', 'audiobook']"
+                    :items="['physical', 'kindle', 'epub', 'pdf']"
                     variant="outlined"
                     density="comfortable"
                   ></v-select>
@@ -203,14 +203,32 @@
 
       <v-divider></v-divider>
 
+      <v-alert
+        v-if="submitError"
+        type="error"
+        variant="tonal"
+        density="compact"
+        class="mx-3 mt-3"
+        :text="submitError"
+      ></v-alert>
+
       <v-card-actions class="pa-3">
         <v-spacer></v-spacer>
         <v-btn variant="plain" @click="close">Cancel</v-btn>
         <v-btn
           color="primary"
+          variant="tonal"
+          :loading="isSaving"
+          :disabled="isSaving || !form.title || !form.author"
+          @click="submitAndAddNext"
+        >
+          Save & Add Next
+        </v-btn>
+        <v-btn
+          color="primary"
           variant="flat"
           :loading="isSaving"
-          :disabled="!form.title || !form.author"
+          :disabled="isSaving || !form.title || !form.author"
           @click="submit"
         >
           Save to Library
@@ -237,6 +255,7 @@ const isSaving = ref(false)
 const isLookingUp = ref(false)
 const isbnInput = ref('')
 const lookupError = ref('')
+const submitError = ref('')
 
 const defaultForm = () => ({
   title: '',
@@ -272,6 +291,7 @@ async function handleLookupISBN() {
       form.genres_tags = data.genres_tags || form.genres_tags
       form.cover_url = data.cover_url || form.cover_url
       form.summary = data.summary || form.summary
+      form.formats = data.formats || form.formats
 
       // Switch to manual tab so user can review and select location
       tab.value = 'manual'
@@ -285,27 +305,83 @@ async function handleLookupISBN() {
   }
 }
 
-async function submit() {
-  if (!form.title || !form.author) return
-  isSaving.value = true
+function createPayload() {
+  const payload = { ...form }
+  const textFields = [
+    'isbn',
+    'location_room',
+    'location_unit',
+    'location_shelf',
+    'genres_tags',
+    'cover_url',
+    'summary',
+  ]
+  for (const key of textFields) {
+    if (payload[key] === '') payload[key] = null
+  }
+  for (const key of ['publication_year', 'page_count']) {
+    const value = payload[key]
+    if (value === '' || value === null || Number.isNaN(value)) payload[key] = null
+  }
+  return payload
+}
 
+async function persistBook() {
+  if (isSaving.value) return false
+  tab.value = 'manual'
+  submitError.value = ''
+
+  let valid = Boolean(form.title && form.author)
+  if (formRef.value) {
+    const result = await formRef.value.validate()
+    valid = result === true || result?.valid === true
+  }
+  if (!valid || !form.title || !form.author) {
+    submitError.value = 'Title and author are required.'
+    return false
+  }
+
+  isSaving.value = true
   try {
-    const payload = { ...form }
-    await api.createBook(payload)
+    await api.createBook(createPayload())
     emit('saved')
-    close()
+    return true
   } catch (err) {
-    console.error('Failed to create book', err)
+    const detail = err?.response?.data?.detail
+    if (typeof detail === 'string') {
+      submitError.value = detail
+    } else if (Array.isArray(detail) && detail[0]?.msg) {
+      submitError.value = detail[0].msg
+    } else {
+      submitError.value = 'Failed to save book. You can keep editing and try again.'
+    }
+    return false
   } finally {
     isSaving.value = false
   }
 }
 
-function close() {
-  emit('update:modelValue', false)
+async function submit() {
+  const ok = await persistBook()
+  if (ok) close()
+}
+
+async function submitAndAddNext() {
+  const ok = await persistBook()
+  if (ok) resetForm()
+}
+
+function resetForm() {
   Object.assign(form, defaultForm())
   isbnInput.value = ''
   lookupError.value = ''
+  submitError.value = ''
   tab.value = 'manual'
+  formRef.value?.resetValidation?.()
+}
+
+function close() {
+  emit('update:modelValue', false)
+  resetForm()
 }
 </script>

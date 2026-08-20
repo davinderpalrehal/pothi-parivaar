@@ -3,14 +3,122 @@
     <v-card v-if="book">
       <v-toolbar color="primary" density="compact">
         <v-toolbar-title class="text-subtitle-1 font-weight-bold">
-          Book Details
+          {{ isEditing ? 'Edit Book' : 'Book Details' }}
         </v-toolbar-title>
         <v-spacer></v-spacer>
         <v-btn icon="mdi-close" variant="text" @click="$emit('update:modelValue', false)"></v-btn>
       </v-toolbar>
 
       <v-card-text class="pt-4">
-        <v-row>
+        <v-form v-if="isEditing" ref="editFormRef" v-model="isEditValid">
+          <v-row density="compact">
+            <v-col cols="12" sm="8">
+              <v-text-field
+                v-model="editForm.title"
+                label="Book Title *"
+                :rules="[v => !!v || 'Title is required']"
+                variant="outlined"
+                density="comfortable"
+              ></v-text-field>
+            </v-col>
+            <v-col cols="12" sm="4">
+              <v-text-field
+                v-model="editForm.author"
+                label="Author *"
+                :rules="[v => !!v || 'Author is required']"
+                variant="outlined"
+                density="comfortable"
+              ></v-text-field>
+            </v-col>
+            <v-col cols="12" sm="4">
+              <v-text-field
+                v-model.number="editForm.publication_year"
+                label="Publication Year"
+                type="number"
+                variant="outlined"
+                density="comfortable"
+              ></v-text-field>
+            </v-col>
+            <v-col cols="12" sm="4">
+              <v-text-field
+                v-model.number="editForm.page_count"
+                label="Page Count"
+                type="number"
+                variant="outlined"
+                density="comfortable"
+              ></v-text-field>
+            </v-col>
+            <v-col cols="12" sm="4">
+              <v-text-field
+                v-model="editForm.isbn"
+                label="ISBN"
+                variant="outlined"
+                density="comfortable"
+              ></v-text-field>
+            </v-col>
+            <v-col cols="12" sm="4">
+              <v-text-field
+                v-model="editForm.location_room"
+                label="Room"
+                variant="outlined"
+                density="comfortable"
+              ></v-text-field>
+            </v-col>
+            <v-col cols="12" sm="4">
+              <v-text-field
+                v-model="editForm.location_unit"
+                label="Unit"
+                variant="outlined"
+                density="comfortable"
+              ></v-text-field>
+            </v-col>
+            <v-col cols="12" sm="4">
+              <v-text-field
+                v-model="editForm.location_shelf"
+                label="Shelf"
+                variant="outlined"
+                density="comfortable"
+              ></v-text-field>
+            </v-col>
+            <v-col cols="12" sm="8">
+              <v-text-field
+                v-model="editForm.genres_tags"
+                label="Genres / Tags"
+                variant="outlined"
+                density="comfortable"
+              ></v-text-field>
+            </v-col>
+            <v-col cols="12" sm="4">
+              <v-select
+                v-model="editForm.formats"
+                label="Format"
+                :items="formatItems"
+                variant="outlined"
+                density="comfortable"
+              ></v-select>
+            </v-col>
+            <v-col cols="12">
+              <v-text-field
+                v-model="editForm.cover_url"
+                label="Cover Image URL"
+                variant="outlined"
+                density="comfortable"
+                clearable
+              ></v-text-field>
+            </v-col>
+            <v-col cols="12">
+              <v-textarea
+                v-model="editForm.summary"
+                label="Summary / Notes"
+                rows="2"
+                variant="outlined"
+                density="comfortable"
+              ></v-textarea>
+            </v-col>
+          </v-row>
+        </v-form>
+
+        <v-row v-else>
           <v-col cols="12" sm="4" class="d-flex justify-center">
             <v-img
               :src="book.cover_url || 'https://images.unsplash.com/photo-1543002588-bfa74002ed7e?w=400&auto=format&fit=crop&q=60'"
@@ -58,95 +166,122 @@
           </v-col>
         </v-row>
 
-        <v-divider class="my-3"></v-divider>
+        <template v-if="!isEditing">
+          <v-divider class="my-3"></v-divider>
 
-        <div v-if="book.summary" class="mb-3">
-          <div class="text-subtitle-2 font-weight-bold mb-1">Summary / Notes</div>
-          <p class="text-body-2 text-grey-darken-3">{{ book.summary }}</p>
-        </div>
-
-        <!-- Active and Past Readers for this Book -->
-        <div v-if="bookSessions.length > 0" class="mb-3">
-          <div class="text-subtitle-2 font-weight-bold mb-2">
-            <v-icon icon="mdi-history" size="small" class="mr-1"></v-icon>
-            Family Reading Log
+          <div v-if="book.summary" class="mb-3">
+            <div class="text-subtitle-2 font-weight-bold mb-1">Summary / Notes</div>
+            <p class="text-body-2 text-grey-darken-3">{{ book.summary }}</p>
           </div>
-          <v-list density="compact" class="bg-grey-lighten-5 rounded pa-1">
-            <v-list-item v-for="sess in bookSessions" :key="sess.id" class="py-1">
-              <template #prepend>
-                <v-avatar size="28" color="primary" class="mr-2">
-                  <v-icon :icon="sess.reader.avatar_icon || 'mdi-account'" size="small" color="white"></v-icon>
-                </v-avatar>
-              </template>
-              <v-list-item-title class="text-caption font-weight-bold">
-                {{ sess.reader.name }} &bull;
-                <span v-if="sess.status === 'reading'" class="text-primary">Currently Reading (Page {{ sess.current_page }}/{{ book.page_count || '?' }})</span>
-                <span v-else-if="sess.status === 'finished'" class="text-success">Finished on {{ sess.finish_date || 'completed' }}</span>
-                <span v-else class="text-grey">{{ sess.status }}</span>
-              </v-list-item-title>
-              <v-list-item-subtitle v-if="sess.rating || sess.notes" class="text-caption">
-                <span v-if="sess.rating" class="text-amber-darken-3">{{ '★'.repeat(sess.rating) }} </span>
-                <span v-if="sess.notes" class="font-italic text-grey-darken-2">"{{ sess.notes }}"</span>
-              </v-list-item-subtitle>
-            </v-list-item>
-          </v-list>
-        </div>
 
-        <!-- Start Reading Section -->
-        <v-card variant="outlined" class="pa-3 bg-grey-lighten-5">
-          <div class="text-subtitle-2 font-weight-bold mb-2">
-            <v-icon icon="mdi-account-clock-outline" size="small" class="mr-1"></v-icon>
-            Start Reading This Book
+          <!-- Active and Past Readers for this Book -->
+          <div v-if="bookSessions.length > 0" class="mb-3">
+            <div class="text-subtitle-2 font-weight-bold mb-2">
+              <v-icon icon="mdi-history" size="small" class="mr-1"></v-icon>
+              Family Reading Log
+            </div>
+            <v-list density="compact" class="bg-grey-lighten-5 rounded pa-1">
+              <v-list-item v-for="sess in bookSessions" :key="sess.id" class="py-1">
+                <template #prepend>
+                  <v-avatar size="28" color="primary" class="mr-2">
+                    <v-icon :icon="sess.reader.avatar_icon || 'mdi-account'" size="small" color="white"></v-icon>
+                  </v-avatar>
+                </template>
+                <v-list-item-title class="text-caption font-weight-bold">
+                  {{ sess.reader.name }} &bull;
+                  <span v-if="sess.status === 'reading'" class="text-primary">Currently Reading (Page {{ sess.current_page }}/{{ book.page_count || '?' }})</span>
+                  <span v-else-if="sess.status === 'finished'" class="text-success">Finished on {{ sess.finish_date || 'completed' }}</span>
+                  <span v-else class="text-grey">{{ sess.status }}</span>
+                </v-list-item-title>
+                <v-list-item-subtitle v-if="sess.rating || sess.notes" class="text-caption">
+                  <span v-if="sess.rating" class="text-amber-darken-3">{{ '★'.repeat(sess.rating) }} </span>
+                  <span v-if="sess.notes" class="font-italic text-grey-darken-2">"{{ sess.notes }}"</span>
+                </v-list-item-subtitle>
+              </v-list-item>
+            </v-list>
           </div>
-          <v-row density="compact" align="center">
-            <v-col cols="12" sm="7">
-              <v-select
-                v-model="selectedReaderId"
-                :items="readers"
-                item-title="name"
-                item-value="id"
-                label="Select Family Member"
-                density="compact"
-                variant="outlined"
-                hide-details
-              ></v-select>
-            </v-col>
-            <v-col cols="12" sm="5">
-              <v-btn
-                block
-                color="primary"
-                variant="flat"
-                prepend-icon="mdi-book-open-page-variant"
-                :disabled="!selectedReaderId || selectedReaderAlreadyReading"
-                :loading="isStarting"
-                @click="startReading"
-              >
-                {{ selectedReaderAlreadyReading ? 'Already Reading' : 'Start Reading' }}
-              </v-btn>
-            </v-col>
-          </v-row>
-        </v-card>
+
+          <!-- Start Reading Section -->
+          <v-card variant="outlined" class="pa-3 bg-grey-lighten-5">
+            <div class="text-subtitle-2 font-weight-bold mb-2">
+              <v-icon icon="mdi-account-clock-outline" size="small" class="mr-1"></v-icon>
+              Start Reading This Book
+            </div>
+            <v-row density="compact" align="center">
+              <v-col cols="12" sm="7">
+                <v-select
+                  v-model="selectedReaderId"
+                  :items="readers"
+                  item-title="name"
+                  item-value="id"
+                  label="Select Family Member"
+                  density="compact"
+                  variant="outlined"
+                  hide-details
+                ></v-select>
+              </v-col>
+              <v-col cols="12" sm="5">
+                <v-btn
+                  block
+                  color="primary"
+                  variant="flat"
+                  prepend-icon="mdi-book-open-page-variant"
+                  :disabled="!selectedReaderId || selectedReaderAlreadyReading"
+                  :loading="isStarting"
+                  @click="startReading"
+                >
+                  {{ selectedReaderAlreadyReading ? 'Already Reading' : 'Start Reading' }}
+                </v-btn>
+              </v-col>
+            </v-row>
+          </v-card>
+        </template>
       </v-card-text>
 
       <v-divider></v-divider>
 
       <v-card-actions class="pa-3 justify-space-between">
-        <v-btn color="error" variant="text" prepend-icon="mdi-delete-outline" @click="deleteBook">
+        <v-btn v-if="!isEditing" color="error" variant="text" prepend-icon="mdi-delete-outline" @click="showDeleteConfirm = true">
           Delete
         </v-btn>
-        <v-btn color="primary" variant="tonal" @click="$emit('update:modelValue', false)">
-          Close
+        <v-btn v-else variant="plain" @click="cancelEdit">
+          Cancel
         </v-btn>
+        <div>
+          <v-btn v-if="!isEditing" color="primary" variant="tonal" prepend-icon="mdi-pencil" class="mr-2" @click="startEdit">
+            Edit
+          </v-btn>
+          <v-btn v-if="isEditing" color="primary" variant="flat" :loading="isSaving" :disabled="isSaving" @click="saveEdit">
+            Save Changes
+          </v-btn>
+          <v-btn v-else color="primary" variant="tonal" @click="$emit('update:modelValue', false)">
+            Close
+          </v-btn>
+        </div>
       </v-card-actions>
     </v-card>
     <v-snackbar v-model="snackbar.show" :color="snackbar.color" timeout="4000">
       {{ snackbar.text }}
     </v-snackbar>
   </v-dialog>
+
+  <v-dialog v-model="showDeleteConfirm" max-width="420" persistent>
+    <v-card>
+      <v-card-title class="text-subtitle-1 font-weight-bold">Delete this book?</v-card-title>
+      <v-card-text>
+        Are you sure you want to delete "{{ book?.title }}"? This cannot be undone.
+      </v-card-text>
+      <v-card-actions class="pa-3">
+        <v-spacer></v-spacer>
+        <v-btn variant="plain" @click="showDeleteConfirm = false">Cancel</v-btn>
+        <v-btn color="error" variant="flat" :loading="isDeleting" @click="confirmDelete">Delete</v-btn>
+      </v-card-actions>
+    </v-card>
+  </v-dialog>
 </template>
 
 <script setup>
-import { computed, ref, watch } from 'vue'
+import { computed, reactive, ref, watch } from 'vue'
 import api from '../services/api'
 
 const props = defineProps({
@@ -160,7 +295,24 @@ const readers = ref([])
 const bookSessions = ref([])
 const selectedReaderId = ref(null)
 const isStarting = ref(false)
+const isEditing = ref(false)
+const isSaving = ref(false)
+const isDeleting = ref(false)
+const isEditValid = ref(false)
+const showDeleteConfirm = ref(false)
+const editFormRef = ref(null)
 const snackbar = ref({ show: false, text: '', color: 'error' })
+
+const STANDARD_FORMATS = ['physical', 'kindle', 'epub', 'pdf']
+const editForm = reactive(emptyEditForm())
+
+const formatItems = computed(() => {
+  const current = editForm.formats
+  if (current && !STANDARD_FORMATS.includes(current)) {
+    return [...STANDARD_FORMATS, current]
+  }
+  return STANDARD_FORMATS
+})
 
 const selectedReaderAlreadyReading = computed(() => {
   if (!selectedReaderId.value) return false
@@ -169,6 +321,23 @@ const selectedReaderAlreadyReading = computed(() => {
   )
 })
 
+function emptyEditForm() {
+  return {
+    title: '',
+    author: '',
+    publication_year: null,
+    page_count: null,
+    isbn: '',
+    location_room: '',
+    location_unit: '',
+    location_shelf: '',
+    genres_tags: '',
+    formats: 'physical',
+    cover_url: '',
+    summary: '',
+  }
+}
+
 function notify(text, color = 'error') {
   snackbar.value = { show: true, text, color }
 }
@@ -176,6 +345,73 @@ function notify(text, color = 'error') {
 function errorMessage(err, fallback) {
   const detail = err?.response?.data?.detail
   return typeof detail === 'string' ? detail : fallback
+}
+
+function startEdit() {
+  if (!props.book) return
+  Object.assign(editForm, emptyEditForm(), {
+    title: props.book.title || '',
+    author: props.book.author || '',
+    publication_year: props.book.publication_year ?? null,
+    page_count: props.book.page_count ?? null,
+    isbn: props.book.isbn || '',
+    location_room: props.book.location_room || '',
+    location_unit: props.book.location_unit || '',
+    location_shelf: props.book.location_shelf || '',
+    genres_tags: props.book.genres_tags || '',
+    formats: props.book.formats || 'physical',
+    cover_url: props.book.cover_url || '',
+    summary: props.book.summary || '',
+  })
+  isEditing.value = true
+}
+
+function cancelEdit() {
+  isEditing.value = false
+}
+
+function updatePayload() {
+  const payload = { ...editForm }
+  const textFields = [
+    'isbn',
+    'location_room',
+    'location_unit',
+    'location_shelf',
+    'cover_url',
+    'summary',
+    'genres_tags',
+  ]
+  for (const key of textFields) {
+    if (payload[key] === '') payload[key] = null
+  }
+  for (const key of ['publication_year', 'page_count']) {
+    const value = payload[key]
+    if (value === '' || value === null || Number.isNaN(value)) payload[key] = null
+  }
+  return payload
+}
+
+async function saveEdit() {
+  if (!props.book || isSaving.value) return
+  let valid = Boolean(editForm.title && editForm.author)
+  if (editFormRef.value) {
+    const result = await editFormRef.value.validate()
+    valid = result === true || result?.valid === true
+  }
+  if (!valid || !editForm.title || !editForm.author) {
+    notify('Title and author are required')
+    return
+  }
+  isSaving.value = true
+  try {
+    const res = await api.updateBook(props.book.id, updatePayload())
+    isEditing.value = false
+    emit('refresh', res.data)
+  } catch (err) {
+    notify(errorMessage(err, 'Failed to update book'))
+  } finally {
+    isSaving.value = false
+  }
 }
 
 async function loadData() {
@@ -204,9 +440,11 @@ async function loadData() {
 }
 
 watch(
-  () => [props.modelValue, props.book],
-  ([val, book]) => {
-    if (val && book) {
+  () => [props.modelValue, props.book?.id],
+  ([val, bookId]) => {
+    if (val && bookId) {
+      isEditing.value = false
+      showDeleteConfirm.value = false
       loadData()
     }
   },
@@ -236,16 +474,18 @@ async function startReading() {
   }
 }
 
-async function deleteBook() {
+async function confirmDelete() {
   if (!props.book) return
-  if (confirm(`Are you sure you want to delete "${props.book.title}"?`)) {
-    try {
-      await api.deleteBook(props.book.id)
-      emit('refresh')
-      emit('update:modelValue', false)
-    } catch (err) {
-      notify(errorMessage(err, 'Failed to delete book'))
-    }
+  isDeleting.value = true
+  try {
+    await api.deleteBook(props.book.id)
+    showDeleteConfirm.value = false
+    emit('refresh')
+    emit('update:modelValue', false)
+  } catch (err) {
+    notify(errorMessage(err, 'Failed to delete book'))
+  } finally {
+    isDeleting.value = false
   }
 }
 </script>
