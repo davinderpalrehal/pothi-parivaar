@@ -73,6 +73,9 @@ export default {
   getLocations() {
     return apiClient.get('/locations')
   },
+  createLocation(locationData) {
+    return apiClient.post('/locations', locationData)
+  },
   getLocationsSummary() {
     return apiClient.get('/locations/summary')
   },

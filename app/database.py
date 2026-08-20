@@ -2,6 +2,7 @@ from typing import Generator
 from sqlalchemy import event, Engine
 from sqlmodel import SQLModel, create_engine, Session
 from app.config import settings
+from app.services.location_service import LOCATION_TRIPLE_INDEX_SQL
 
 # Create SQLite engine
 connect_args = {"check_same_thread": False}
@@ -27,7 +28,8 @@ def migrate_schema(db_engine: Engine) -> None:
 
     SQLModel's ``create_all`` creates missing tables but intentionally does not
     add columns to existing ones. These additive upgrades keep a family's
-    existing local catalog usable when reader-profile fields are introduced.
+    existing local catalog usable when reader-profile fields are introduced,
+    and install the case-insensitive location triple unique index.
     """
     with db_engine.begin() as connection:
         reader_columns = {
@@ -49,6 +51,50 @@ def migrate_schema(db_engine: Engine) -> None:
                 connection.exec_driver_sql("ALTER TABLE readingsession ADD COLUMN notes VARCHAR")
             if "rating" not in session_columns:
                 connection.exec_driver_sql("ALTER TABLE readingsession ADD COLUMN rating INTEGER")
+
+        location_table = connection.exec_driver_sql(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name='location'"
+        ).first()
+        book_table = connection.exec_driver_sql(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name='book'"
+        ).first()
+        if location_table:
+            connection.exec_driver_sql("UPDATE location SET unit = '' WHERE unit IS NULL")
+            connection.exec_driver_sql("UPDATE location SET shelf = '' WHERE shelf IS NULL")
+            if book_table:
+                connection.exec_driver_sql(
+                    """
+                    INSERT INTO location (room, unit, shelf)
+                    SELECT b.room, b.unit, b.shelf FROM (
+                      SELECT
+                        TRIM(location_room) AS room,
+                        TRIM(COALESCE(location_unit, '')) AS unit,
+                        TRIM(COALESCE(location_shelf, '')) AS shelf
+                      FROM book
+                      WHERE location_room IS NOT NULL AND TRIM(location_room) != ''
+                      GROUP BY
+                        lower(trim(location_room)),
+                        lower(trim(COALESCE(location_unit, ''))),
+                        lower(trim(COALESCE(location_shelf, '')))
+                    ) b
+                    WHERE NOT EXISTS (
+                      SELECT 1 FROM location l
+                      WHERE lower(trim(l.room)) = lower(b.room)
+                        AND lower(trim(l.unit)) = lower(b.unit)
+                        AND lower(trim(l.shelf)) = lower(b.shelf)
+                    )
+                    """
+                )
+            connection.exec_driver_sql(
+                """
+                DELETE FROM location
+                WHERE id NOT IN (
+                  SELECT MIN(id) FROM location
+                  GROUP BY lower(trim(room)), lower(trim(unit)), lower(trim(shelf))
+                )
+                """
+            )
+            connection.exec_driver_sql(LOCATION_TRIPLE_INDEX_SQL)
 
 
 def init_db() -> None:

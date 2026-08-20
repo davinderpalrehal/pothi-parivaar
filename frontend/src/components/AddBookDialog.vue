@@ -132,28 +132,37 @@
                 </v-col>
 
                 <v-col cols="12" sm="4">
-                  <v-text-field
+                  <v-combobox
                     v-model="form.location_room"
                     label="Room (e.g. Living Room)"
+                    :items="roomOptions"
+                    :custom-filter="locationFilter"
                     variant="outlined"
                     density="comfortable"
-                  ></v-text-field>
+                    clearable
+                  ></v-combobox>
                 </v-col>
                 <v-col cols="12" sm="4">
-                  <v-text-field
+                  <v-combobox
                     v-model="form.location_unit"
                     label="Unit (e.g. Main Shelf)"
+                    :items="unitOptions"
+                    :custom-filter="locationFilter"
                     variant="outlined"
                     density="comfortable"
-                  ></v-text-field>
+                    clearable
+                  ></v-combobox>
                 </v-col>
                 <v-col cols="12" sm="4">
-                  <v-text-field
+                  <v-combobox
                     v-model="form.location_shelf"
                     label="Shelf (e.g. Top Shelf)"
+                    :items="shelfOptions"
+                    :custom-filter="locationFilter"
                     variant="outlined"
                     density="comfortable"
-                  ></v-text-field>
+                    clearable
+                  ></v-combobox>
                 </v-col>
 
                 <!-- Metadata -->
@@ -239,14 +248,15 @@
 </template>
 
 <script setup>
-import { ref, reactive } from 'vue'
+import { ref, reactive, computed, watch } from 'vue'
 import api from '../services/api'
 
-defineProps({
+const props = defineProps({
   modelValue: Boolean,
 })
 
 const emit = defineEmits(['update:modelValue', 'saved'])
+const locations = ref([])
 
 const tab = ref('manual')
 const isFormValid = ref(false)
@@ -273,6 +283,73 @@ const defaultForm = () => ({
 })
 
 const form = reactive(defaultForm())
+
+function locationFilter(value, query) {
+  if (!query || !String(query).trim()) return true
+  return String(value ?? '')
+    .trim()
+    .toLowerCase()
+    .includes(String(query).trim().toLowerCase())
+}
+
+function uniqueNormalized(values) {
+  const seen = new Set()
+  const items = []
+  for (const raw of values) {
+    const value = raw == null ? '' : String(raw)
+    const key = value.trim().toLowerCase()
+    if (seen.has(key)) continue
+    seen.add(key)
+    items.push(value)
+  }
+  return items
+}
+
+const roomOptions = computed(() => {
+  return uniqueNormalized(locations.value.map((loc) => loc.room).filter((room) => (room || '').trim()))
+})
+
+const unitOptions = computed(() => {
+  const room = (form.location_room || '').trim().toLowerCase()
+  if (!room) return []
+  return uniqueNormalized(
+    locations.value
+      .filter((loc) => (loc.room || '').trim().toLowerCase() === room)
+      .map((loc) => loc.unit ?? '')
+  )
+})
+
+const shelfOptions = computed(() => {
+  const room = (form.location_room || '').trim().toLowerCase()
+  const unit = (form.location_unit || '').trim().toLowerCase()
+  if (!room) return []
+  return uniqueNormalized(
+    locations.value
+      .filter((loc) => {
+        const sameRoom = (loc.room || '').trim().toLowerCase() === room
+        const sameUnit = (loc.unit || '').trim().toLowerCase() === unit
+        return sameRoom && sameUnit
+      })
+      .map((loc) => loc.shelf ?? '')
+  )
+})
+
+async function loadLocationOptions() {
+  try {
+    const res = await api.getLocations()
+    locations.value = res.data || []
+  } catch {
+    locations.value = []
+  }
+}
+
+watch(
+  () => props.modelValue,
+  (open) => {
+    if (open) loadLocationOptions()
+  },
+  { immediate: true }
+)
 
 async function handleLookupISBN() {
   if (!isbnInput.value) return
@@ -344,6 +421,7 @@ async function persistBook() {
   isSaving.value = true
   try {
     await api.createBook(createPayload())
+    await loadLocationOptions()
     emit('saved')
     return true
   } catch (err) {
