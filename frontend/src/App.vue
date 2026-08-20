@@ -75,7 +75,7 @@
           <!-- Search & Filter Bar -->
           <v-card class="mb-4 pa-3" elevation="1">
             <v-row density="compact" align="center">
-              <v-col cols="12" sm="6" md="7">
+              <v-col cols="12" sm="6" md="3">
                 <v-text-field
                   v-model="searchQuery"
                   label="Search by title, author, tag, or ISBN..."
@@ -87,10 +87,10 @@
                   @update:model-value="fetchBooks"
                 ></v-text-field>
               </v-col>
-              <v-col cols="12" sm="3" md="3">
+              <v-col cols="6" sm="3" md="2">
                 <v-text-field
                   v-model="genreFilter"
-                  label="Filter by Tag/Genre"
+                  label="Tag/Genre"
                   prepend-inner-icon="mdi-tag-outline"
                   variant="outlined"
                   density="comfortable"
@@ -99,17 +99,52 @@
                   @update:model-value="fetchBooks"
                 ></v-text-field>
               </v-col>
-              <v-col cols="12" sm="3" md="2">
+              <v-col cols="6" sm="3" md="2">
+                <v-select
+                  v-model="formatFilter"
+                  label="Format"
+                  :items="formatOptions"
+                  variant="outlined"
+                  density="comfortable"
+                  hide-details
+                  clearable
+                  @update:model-value="fetchBooks"
+                ></v-select>
+              </v-col>
+              <v-col cols="6" sm="3" md="2">
+                <v-select
+                  v-model="statusFilter"
+                  label="Status"
+                  :items="statusOptions"
+                  variant="outlined"
+                  density="comfortable"
+                  hide-details
+                  clearable
+                  @update:model-value="fetchBooks"
+                ></v-select>
+              </v-col>
+              <v-col cols="6" sm="3" md="2">
+                <v-text-field
+                  v-model="roomFilter"
+                  label="Room"
+                  prepend-inner-icon="mdi-map-marker-outline"
+                  variant="outlined"
+                  density="comfortable"
+                  hide-details
+                  clearable
+                  @update:model-value="fetchBooks"
+                ></v-text-field>
+              </v-col>
+              <v-col cols="12" sm="3" md="1">
                 <v-btn
                   block
                   color="primary"
                   variant="tonal"
                   height="44"
-                  prepend-icon="mdi-refresh"
+                  icon="mdi-refresh"
+                  aria-label="Refresh catalog"
                   @click="fetchBooks"
-                >
-                  Refresh
-                </v-btn>
+                ></v-btn>
               </v-col>
             </v-row>
           </v-card>
@@ -284,6 +319,20 @@ const activeReadersByBook = ref({})
 const loading = ref(false)
 const searchQuery = ref('')
 const genreFilter = ref('')
+const formatFilter = ref(null)
+const statusFilter = ref(null)
+const roomFilter = ref('')
+const formatOptions = [
+  { title: 'Physical', value: 'physical' },
+  { title: 'Kindle', value: 'kindle' },
+  { title: 'EPUB', value: 'epub' },
+  { title: 'PDF', value: 'pdf' },
+]
+const statusOptions = [
+  { title: 'Available', value: 'available' },
+  { title: 'Reading', value: 'reading' },
+  { title: 'Finished', value: 'finished' },
+]
 
 const showAddBook = ref(false)
 const showBookDetail = ref(false)
@@ -301,8 +350,16 @@ async function fetchBooks() {
     const params = {}
     if (searchQuery.value) params.q = searchQuery.value
     if (genreFilter.value) params.genre = genreFilter.value
+    if (formatFilter.value) params.format = formatFilter.value
+    const room = (roomFilter.value || '').trim()
+    if (room) params.room = room
+    if (statusFilter.value) params.status = statusFilter.value
     const booksRes = await api.getBooks(params)
     books.value = booksRes.data
+    if (selectedBook.value) {
+      const fresh = books.value.find((b) => b.id === selectedBook.value.id)
+      if (fresh) selectedBook.value = fresh
+    }
   } catch (err) {
     console.error('Failed to fetch books', err)
   } finally {
@@ -347,7 +404,10 @@ function openBookDetail(book) {
   showBookDetail.value = true
 }
 
-function handleBookSaved() {
+function handleBookSaved(updatedBook) {
+  if (updatedBook?.id) {
+    selectedBook.value = { ...(selectedBook.value || {}), ...updatedBook }
+  }
   fetchBooks()
   if (trackerRef.value) trackerRef.value.loadData()
   if (shelvesRef.value) shelvesRef.value.loadLocations()
@@ -359,7 +419,7 @@ function handleReadingUpdated() {
 
 function handleFilterRoom(room) {
   currentView.value = 'catalog'
-  searchQuery.value = room
+  roomFilter.value = room
   fetchBooks()
 }
 
