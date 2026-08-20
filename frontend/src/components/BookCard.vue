@@ -49,6 +49,15 @@
         >
           Read {{ book.read_count }}x
         </v-chip>
+        <v-chip
+          v-if="activeReaders.length"
+          size="x-small"
+          color="info"
+          variant="tonal"
+          prepend-icon="mdi-book-open-page-variant"
+        >
+          Reading: {{ activeReaders.join(', ') }}
+        </v-chip>
       </div>
 
       <p v-if="book.summary" class="text-caption text-grey-darken-1 text-truncate-2 mt-1">
@@ -79,6 +88,10 @@ const props = defineProps({
   book: {
     type: Object,
     required: true,
+  },
+  activeReaders: {
+    type: Array,
+    default: () => [],
   },
 })
 

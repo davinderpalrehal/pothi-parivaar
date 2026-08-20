@@ -18,7 +18,13 @@
               max-width="160"
               cover
               class="rounded elevation-2"
-            ></v-img>
+            >
+              <template #placeholder>
+                <div class="d-flex align-center justify-center fill-height bg-grey-lighten-3">
+                  <v-icon icon="mdi-book" size="large" color="grey"></v-icon>
+                </div>
+              </template>
+            </v-img>
           </v-col>
 
           <v-col cols="12" sm="8">
@@ -40,30 +46,57 @@
               </v-chip>
             </div>
 
-            <div v-if="book.genres_tags" class="text-caption text-grey-darken-1 mb-2">
+            <div v-if="book.genres_tags" class="text-caption text-grey-darken-1 mb-1">
               <strong>Genres:</strong> {{ book.genres_tags }}
             </div>
-            <div v-if="book.isbn" class="text-caption text-grey-darken-1 mb-2">
+            <div v-if="book.isbn" class="text-caption text-grey-darken-1 mb-1">
               <strong>ISBN:</strong> {{ book.isbn }}
             </div>
-            <div class="text-caption text-grey-darken-1 mb-2">
-              <strong>Read Count:</strong> {{ book.read_count }} time(s)
+            <div class="text-caption text-grey-darken-1 mb-1">
+              <strong>Total Times Read:</strong> {{ book.read_count }} time(s)
             </div>
           </v-col>
         </v-row>
 
         <v-divider class="my-3"></v-divider>
 
-        <div v-if="book.summary" class="mb-4">
+        <div v-if="book.summary" class="mb-3">
           <div class="text-subtitle-2 font-weight-bold mb-1">Summary / Notes</div>
           <p class="text-body-2 text-grey-darken-3">{{ book.summary }}</p>
         </div>
 
-        <!-- Reader Assignment / Action -->
+        <!-- Active and Past Readers for this Book -->
+        <div v-if="bookSessions.length > 0" class="mb-3">
+          <div class="text-subtitle-2 font-weight-bold mb-2">
+            <v-icon icon="mdi-history" size="small" class="mr-1"></v-icon>
+            Family Reading Log
+          </div>
+          <v-list density="compact" class="bg-grey-lighten-5 rounded pa-1">
+            <v-list-item v-for="sess in bookSessions" :key="sess.id" class="py-1">
+              <template #prepend>
+                <v-avatar size="28" color="primary" class="mr-2">
+                  <v-icon :icon="sess.reader.avatar_icon || 'mdi-account'" size="small" color="white"></v-icon>
+                </v-avatar>
+              </template>
+              <v-list-item-title class="text-caption font-weight-bold">
+                {{ sess.reader.name }} &bull;
+                <span v-if="sess.status === 'reading'" class="text-primary">Currently Reading (Page {{ sess.current_page }}/{{ book.page_count || '?' }})</span>
+                <span v-else-if="sess.status === 'finished'" class="text-success">Finished on {{ sess.finish_date || 'completed' }}</span>
+                <span v-else class="text-grey">{{ sess.status }}</span>
+              </v-list-item-title>
+              <v-list-item-subtitle v-if="sess.rating || sess.notes" class="text-caption">
+                <span v-if="sess.rating" class="text-amber-darken-3">{{ '★'.repeat(sess.rating) }} </span>
+                <span v-if="sess.notes" class="font-italic text-grey-darken-2">"{{ sess.notes }}"</span>
+              </v-list-item-subtitle>
+            </v-list-item>
+          </v-list>
+        </div>
+
+        <!-- Start Reading Section -->
         <v-card variant="outlined" class="pa-3 bg-grey-lighten-5">
           <div class="text-subtitle-2 font-weight-bold mb-2">
             <v-icon icon="mdi-account-clock-outline" size="small" class="mr-1"></v-icon>
-            Family Reader Action
+            Start Reading This Book
           </div>
           <v-row density="compact" align="center">
             <v-col cols="12" sm="7">
@@ -72,7 +105,7 @@
                 :items="readers"
                 item-title="name"
                 item-value="id"
-                label="Select Reader"
+                label="Select Family Member"
                 density="compact"
                 variant="outlined"
                 hide-details
@@ -83,11 +116,12 @@
                 block
                 color="primary"
                 variant="flat"
-                :disabled="!selectedReaderId"
+                prepend-icon="mdi-book-open-page-variant"
+                :disabled="!selectedReaderId || selectedReaderAlreadyReading"
                 :loading="isStarting"
                 @click="startReading"
               >
-                Start Reading
+                {{ selectedReaderAlreadyReading ? 'Already Reading' : 'Start Reading' }}
               </v-btn>
             </v-col>
           </v-row>
@@ -105,11 +139,14 @@
         </v-btn>
       </v-card-actions>
     </v-card>
+    <v-snackbar v-model="snackbar.show" :color="snackbar.color" timeout="4000">
+      {{ snackbar.text }}
+    </v-snackbar>
   </v-dialog>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { computed, ref, watch } from 'vue'
 import api from '../services/api'
 
 const props = defineProps({
@@ -120,23 +157,68 @@ const props = defineProps({
 const emit = defineEmits(['update:modelValue', 'refresh'])
 
 const readers = ref([])
+const bookSessions = ref([])
 const selectedReaderId = ref(null)
 const isStarting = ref(false)
+const snackbar = ref({ show: false, text: '', color: 'error' })
 
-onMounted(async () => {
+const selectedReaderAlreadyReading = computed(() => {
+  if (!selectedReaderId.value) return false
+  return bookSessions.value.some(
+    (sess) => sess.reader_id === selectedReaderId.value && sess.status === 'reading'
+  )
+})
+
+function notify(text, color = 'error') {
+  snackbar.value = { show: true, text, color }
+}
+
+function errorMessage(err, fallback) {
+  const detail = err?.response?.data?.detail
+  return typeof detail === 'string' ? detail : fallback
+}
+
+async function loadData() {
+  if (!props.book) return
+  const bookId = props.book.id
   try {
-    const res = await api.getReaders()
-    readers.value = res.data
-    if (readers.value.length > 0) {
-      selectedReaderId.value = readers.value[0].id
+    const readersRes = await api.getReaders()
+    if (props.book?.id !== bookId) return
+    readers.value = readersRes.data
+    if (!readers.value.some((reader) => reader.id === selectedReaderId.value)) {
+      selectedReaderId.value = readers.value[0]?.id ?? null
     }
   } catch (err) {
-    console.error('Failed to load readers', err)
+    readers.value = []
+    notify(errorMessage(err, 'Failed to load family readers'))
   }
-})
+  try {
+    const sessRes = await api.getBookSessions(bookId)
+    if (props.book?.id !== bookId) return
+    bookSessions.value = sessRes.data
+  } catch (err) {
+    if (props.book?.id !== bookId) return
+    bookSessions.value = []
+    notify(errorMessage(err, 'Failed to load reading history'))
+  }
+}
+
+watch(
+  () => [props.modelValue, props.book],
+  ([val, book]) => {
+    if (val && book) {
+      loadData()
+    }
+  },
+  { immediate: true }
+)
 
 async function startReading() {
   if (!selectedReaderId.value || !props.book) return
+  if (selectedReaderAlreadyReading.value) {
+    notify('This family member is already reading this book', 'warning')
+    return
+  }
   isStarting.value = true
   try {
     await api.createSession({
@@ -146,9 +228,9 @@ async function startReading() {
       current_page: 0,
     })
     emit('refresh')
-    emit('update:modelValue', false)
+    await loadData()
   } catch (err) {
-    console.error('Failed to start reading session', err)
+    notify(errorMessage(err, 'Failed to start reading session'))
   } finally {
     isStarting.value = false
   }
@@ -162,7 +244,7 @@ async function deleteBook() {
       emit('refresh')
       emit('update:modelValue', false)
     } catch (err) {
-      console.error('Failed to delete book', err)
+      notify(errorMessage(err, 'Failed to delete book'))
     }
   }
 }

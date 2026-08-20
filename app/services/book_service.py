@@ -1,6 +1,6 @@
 from typing import Optional
 from sqlmodel import Session, select, or_
-from app.models import Book, BookCreate, BookUpdate
+from app.models import Book, BookCreate, BookUpdate, ReadingSession
 
 
 def create_book(session: Session, book_in: BookCreate) -> Book:
@@ -61,6 +61,10 @@ def update_book(session: Session, book: Book, book_update: BookUpdate) -> Book:
 
 
 def delete_book(session: Session, book: Book) -> None:
-    """Delete a book from the database."""
+    """Delete a book and any reading sessions attached to it."""
+    sessions = session.exec(select(ReadingSession).where(ReadingSession.book_id == book.id)).all()
+    for reading_session in sessions:
+        session.delete(reading_session)
+    session.flush()
     session.delete(book)
     session.commit()
