@@ -5,7 +5,7 @@
       <v-list-item
         prepend-icon="mdi-book-open-page-variant"
         title="Pothi Parivaar"
-        subtitle="Family Physical Library"
+        subtitle="Family Home Library"
         class="py-4"
       ></v-list-item>
       <v-divider></v-divider>
@@ -45,6 +45,14 @@
         <v-icon icon="mdi-book-open-page-variant" class="mr-2"></v-icon>
         Pothi Parivaar
       </v-toolbar-title>
+
+      <!-- Desktop View Switcher Tabs -->
+      <v-tabs v-model="currentView" color="white" class="d-none d-md-flex">
+        <v-tab value="catalog" prepend-icon="mdi-bookshelf">Catalog</v-tab>
+        <v-tab value="tracker" prepend-icon="mdi-account-group">Reading Tracker</v-tab>
+        <v-tab value="shelves" prepend-icon="mdi-map-marker-path">Shelves</v-tab>
+        <v-tab value="hermes" prepend-icon="mdi-robot">Hermes AI</v-tab>
+      </v-tabs>
 
       <v-spacer></v-spacer>
 
@@ -130,14 +138,18 @@
               md="4"
               lg="3"
             >
-              <BookCard :book="book" @select="openBookDetail" />
+              <BookCard
+                :book="book"
+                :active-readers="activeReadersByBook[book.id] || []"
+                @select="openBookDetail"
+              />
             </v-col>
           </v-row>
         </div>
 
         <!-- View: Tracker -->
         <div v-else-if="currentView === 'tracker'">
-          <ReaderTracker ref="trackerRef" @refresh="fetchBooks" />
+          <ReaderTracker ref="trackerRef" @refresh="handleReadingUpdated" />
         </div>
 
         <!-- View: Shelves -->
@@ -221,6 +233,26 @@
       </v-container>
     </v-main>
 
+    <!-- Bottom Navigation on Mobile -->
+    <v-bottom-navigation v-model="currentView" grow color="primary" class="d-flex d-md-none">
+      <v-btn value="catalog">
+        <v-icon>mdi-bookshelf</v-icon>
+        <span>Catalog</span>
+      </v-btn>
+      <v-btn value="tracker">
+        <v-icon>mdi-account-group</v-icon>
+        <span>Tracker</span>
+      </v-btn>
+      <v-btn value="shelves">
+        <v-icon>mdi-map-marker-path</v-icon>
+        <span>Shelves</span>
+      </v-btn>
+      <v-btn value="hermes">
+        <v-icon>mdi-robot</v-icon>
+        <span>Hermes</span>
+      </v-btn>
+    </v-bottom-navigation>
+
     <!-- Dialogs -->
     <AddBookDialog
       v-model="showAddBook"
@@ -248,6 +280,7 @@ const drawer = ref(false)
 const currentView = ref('catalog')
 
 const books = ref([])
+const activeReadersByBook = ref({})
 const loading = ref(false)
 const searchQuery = ref('')
 const genreFilter = ref('')
@@ -268,12 +301,25 @@ async function fetchBooks() {
     const params = {}
     if (searchQuery.value) params.q = searchQuery.value
     if (genreFilter.value) params.genre = genreFilter.value
-    const res = await api.getBooks(params)
-    books.value = res.data
+    const booksRes = await api.getBooks(params)
+    books.value = booksRes.data
   } catch (err) {
     console.error('Failed to fetch books', err)
   } finally {
     loading.value = false
+  }
+
+  try {
+    const activityRes = await api.getReaderActivity()
+    activeReadersByBook.value = activityRes.data.reduce((byBook, activity) => {
+      const readers = byBook[activity.book_id] || []
+      readers.push(activity.reader.name)
+      byBook[activity.book_id] = readers
+      return byBook
+    }, {})
+  } catch (err) {
+    activeReadersByBook.value = {}
+    console.error('Failed to fetch reader activity', err)
   }
 }
 
@@ -305,6 +351,10 @@ function handleBookSaved() {
   fetchBooks()
   if (trackerRef.value) trackerRef.value.loadData()
   if (shelvesRef.value) shelvesRef.value.loadLocations()
+}
+
+function handleReadingUpdated() {
+  fetchBooks()
 }
 
 function handleFilterRoom(room) {

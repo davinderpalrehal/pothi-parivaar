@@ -29,13 +29,31 @@ export default {
   deleteBook(id) {
     return apiClient.delete(`/books/${id}`)
   },
+  getBookSessions(bookId) {
+    return apiClient.get(`/books/${bookId}/sessions`)
+  },
 
   // Readers
   getReaders() {
     return apiClient.get('/readers')
   },
+  getReader(id) {
+    return apiClient.get(`/readers/${id}`)
+  },
   createReader(readerData) {
     return apiClient.post('/readers', readerData)
+  },
+  updateReader(id, readerData) {
+    return apiClient.put(`/readers/${id}`, readerData)
+  },
+  deleteReader(id) {
+    return apiClient.delete(`/readers/${id}`)
+  },
+  getReaderActivity() {
+    return apiClient.get('/readers/activity')
+  },
+  getReaderStats(readerId) {
+    return apiClient.get(`/readers/${readerId}/stats`)
   },
   getReaderSessions(readerId, status = null) {
     const params = status ? { status } : {}
@@ -46,6 +64,9 @@ export default {
   },
   updateSession(sessionId, sessionData) {
     return apiClient.put(`/readers/sessions/${sessionId}`, sessionData)
+  },
+  deleteSession(sessionId) {
+    return apiClient.delete(`/readers/sessions/${sessionId}`)
   },
 
   // Locations

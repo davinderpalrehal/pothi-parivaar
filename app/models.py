@@ -1,5 +1,5 @@
 from datetime import datetime, date, timezone
-from typing import Optional
+from typing import Literal, Optional
 from sqlmodel import SQLModel, Field
 
 
@@ -29,6 +29,8 @@ class Reader(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     name: str = Field(unique=True, index=True)
     avatar_icon: Optional[str] = "mdi-account"
+    age_group: Optional[str] = None  # e.g. "child-10", "child-7", "adult"
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 class ReadingSession(SQLModel, table=True):
@@ -39,6 +41,8 @@ class ReadingSession(SQLModel, table=True):
     current_page: int = Field(default=0)
     start_date: Optional[date] = Field(default_factory=date.today)
     finish_date: Optional[date] = None
+    notes: Optional[str] = None
+    rating: Optional[int] = None  # 1-5 rating on completion
 
 
 class Location(SQLModel, table=True):
@@ -104,26 +108,39 @@ class BookRead(SQLModel):
 class ReaderCreate(SQLModel):
     name: str
     avatar_icon: Optional[str] = "mdi-account"
+    age_group: Optional[str] = None
+
+
+class ReaderUpdate(SQLModel):
+    name: Optional[str] = None
+    avatar_icon: Optional[str] = None
+    age_group: Optional[str] = None
 
 
 class ReaderRead(SQLModel):
     id: int
     name: str
     avatar_icon: Optional[str] = "mdi-account"
+    age_group: Optional[str] = None
+    created_at: Optional[datetime] = None
 
 
 class ReadingSessionCreate(SQLModel):
     book_id: int
     reader_id: int
-    status: Optional[str] = "reading"
+    status: Literal["to_read", "reading", "finished", "abandoned"] = "reading"
     current_page: Optional[int] = 0
     start_date: Optional[date] = None
+    notes: Optional[str] = None
+    rating: Optional[int] = Field(default=None, ge=1, le=5)
 
 
 class ReadingSessionUpdate(SQLModel):
-    status: Optional[str] = None
+    status: Optional[Literal["to_read", "reading", "finished", "abandoned"]] = None
     current_page: Optional[int] = None
     finish_date: Optional[date] = None
+    notes: Optional[str] = None
+    rating: Optional[int] = Field(default=None, ge=1, le=5)
 
 
 class ReadingSessionRead(SQLModel):
@@ -134,6 +151,32 @@ class ReadingSessionRead(SQLModel):
     current_page: int
     start_date: Optional[date] = None
     finish_date: Optional[date] = None
+    notes: Optional[str] = None
+    rating: Optional[int] = None
+
+
+class ReaderActivityRead(SQLModel):
+    id: int
+    book_id: int
+    reader_id: int
+    status: str
+    current_page: int
+    start_date: Optional[date] = None
+    finish_date: Optional[date] = None
+    notes: Optional[str] = None
+    rating: Optional[int] = None
+    reader: ReaderRead
+    book: BookRead
+    progress_percent: float = 0.0
+
+
+class ReaderStatsRead(SQLModel):
+    reader: ReaderRead
+    total_reading: int
+    total_finished: int
+    total_pages_read: int
+    active_sessions: list[ReaderActivityRead]
+    history: list[ReaderActivityRead]
 
 
 class LocationCreate(SQLModel):

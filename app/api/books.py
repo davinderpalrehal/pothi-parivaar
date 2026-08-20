@@ -1,8 +1,17 @@
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlmodel import Session
+from sqlmodel import Session, select
 from app.database import get_session
-from app.models import BookCreate, BookRead, BookUpdate
+from app.models import (
+    Book,
+    BookCreate,
+    BookRead,
+    BookUpdate,
+    Reader,
+    ReaderRead,
+    ReadingSession,
+    ReaderActivityRead,
+)
 from app.services import book_service
 
 router = APIRouter(prefix="/books", tags=["Books"])
@@ -81,3 +90,47 @@ def delete_book(
             detail=f"Book with id {book_id} not found",
         )
     book_service.delete_book(session, book)
+
+
+@router.get("/{book_id}/sessions", response_model=list[ReaderActivityRead])
+def get_book_reading_sessions(
+    book_id: int,
+    session: Session = Depends(get_session),
+) -> list[ReaderActivityRead]:
+    """Retrieve all reading sessions (active & finished) for a specific book."""
+    book = book_service.get_book(session, book_id)
+    if not book:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Book with id {book_id} not found",
+        )
+    statement = (
+        select(ReadingSession, Reader)
+        .where(ReadingSession.book_id == book_id)
+        .join(Reader, ReadingSession.reader_id == Reader.id)
+        .order_by(ReadingSession.start_date.desc())
+    )
+    results = session.exec(statement).all()
+    book_dto = BookRead.model_validate(book)
+    items: list[ReaderActivityRead] = []
+    for rs, reader in results:
+        progress_pct = 0.0
+        if book.page_count and book.page_count > 0:
+            progress_pct = round(min(100.0, (rs.current_page / book.page_count) * 100), 1)
+        items.append(
+            ReaderActivityRead(
+                id=rs.id,
+                book_id=rs.book_id,
+                reader_id=rs.reader_id,
+                status=rs.status,
+                current_page=rs.current_page,
+                start_date=rs.start_date,
+                finish_date=rs.finish_date,
+                notes=rs.notes,
+                rating=rs.rating,
+                reader=ReaderRead.model_validate(reader),
+                book=book_dto,
+                progress_percent=progress_pct,
+            )
+        )
+    return items
