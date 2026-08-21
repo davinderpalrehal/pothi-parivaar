@@ -57,28 +57,37 @@
               ></v-text-field>
             </v-col>
             <v-col cols="12" sm="4">
-              <v-text-field
+              <v-combobox
                 v-model="editForm.location_room"
                 label="Room"
+                :items="roomOptions"
+                :custom-filter="locationFilter"
                 variant="outlined"
                 density="comfortable"
-              ></v-text-field>
+                clearable
+              ></v-combobox>
             </v-col>
             <v-col cols="12" sm="4">
-              <v-text-field
+              <v-combobox
                 v-model="editForm.location_unit"
                 label="Unit"
+                :items="unitOptions"
+                :custom-filter="locationFilter"
                 variant="outlined"
                 density="comfortable"
-              ></v-text-field>
+                clearable
+              ></v-combobox>
             </v-col>
             <v-col cols="12" sm="4">
-              <v-text-field
+              <v-combobox
                 v-model="editForm.location_shelf"
                 label="Shelf"
+                :items="shelfOptions"
+                :custom-filter="locationFilter"
                 variant="outlined"
                 density="comfortable"
-              ></v-text-field>
+                clearable
+              ></v-combobox>
             </v-col>
             <v-col cols="12" sm="8">
               <v-text-field
@@ -292,6 +301,7 @@ const props = defineProps({
 const emit = defineEmits(['update:modelValue', 'refresh'])
 
 const readers = ref([])
+const locations = ref([])
 const bookSessions = ref([])
 const selectedReaderId = ref(null)
 const isStarting = ref(false)
@@ -313,6 +323,65 @@ const formatItems = computed(() => {
   }
   return STANDARD_FORMATS
 })
+
+function locationFilter(value, query) {
+  if (!query || !String(query).trim()) return true
+  return String(value ?? '')
+    .trim()
+    .toLowerCase()
+    .includes(String(query).trim().toLowerCase())
+}
+
+function uniqueNormalized(values) {
+  const seen = new Set()
+  const items = []
+  for (const raw of values) {
+    const value = raw == null ? '' : String(raw)
+    const key = value.trim().toLowerCase()
+    if (seen.has(key)) continue
+    seen.add(key)
+    items.push(value)
+  }
+  return items
+}
+
+const roomOptions = computed(() => {
+  return uniqueNormalized(locations.value.map((loc) => loc.room).filter((room) => (room || '').trim()))
+})
+
+const unitOptions = computed(() => {
+  const room = (editForm.location_room || '').trim().toLowerCase()
+  if (!room) return []
+  return uniqueNormalized(
+    locations.value
+      .filter((loc) => (loc.room || '').trim().toLowerCase() === room)
+      .map((loc) => loc.unit ?? '')
+  )
+})
+
+const shelfOptions = computed(() => {
+  const room = (editForm.location_room || '').trim().toLowerCase()
+  const unit = (editForm.location_unit || '').trim().toLowerCase()
+  if (!room) return []
+  return uniqueNormalized(
+    locations.value
+      .filter((loc) => {
+        const sameRoom = (loc.room || '').trim().toLowerCase() === room
+        const sameUnit = (loc.unit || '').trim().toLowerCase() === unit
+        return sameRoom && sameUnit
+      })
+      .map((loc) => loc.shelf ?? '')
+  )
+})
+
+async function loadLocationOptions() {
+  try {
+    const res = await api.getLocations()
+    locations.value = res.data || []
+  } catch {
+    locations.value = []
+  }
+}
 
 const selectedReaderAlreadyReading = computed(() => {
   if (!selectedReaderId.value) return false
@@ -406,6 +475,7 @@ async function saveEdit() {
   try {
     const res = await api.updateBook(props.book.id, updatePayload())
     isEditing.value = false
+    await loadLocationOptions()
     emit('refresh', res.data)
   } catch (err) {
     notify(errorMessage(err, 'Failed to update book'))
@@ -445,7 +515,10 @@ watch(
     if (val && bookId) {
       isEditing.value = false
       showDeleteConfirm.value = false
+      loadLocationOptions()
       loadData()
+    } else if (val) {
+      loadLocationOptions()
     }
   },
   { immediate: true }

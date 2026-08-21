@@ -1,5 +1,6 @@
 from datetime import datetime, date, timezone
 from typing import Literal, Optional
+from pydantic import field_validator
 from sqlmodel import SQLModel, Field
 
 
@@ -48,8 +49,8 @@ class ReadingSession(SQLModel, table=True):
 class Location(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     room: str
-    unit: str
-    shelf: str
+    unit: str = ""
+    shelf: str = ""
 
 
 # ==============================================================================
@@ -181,8 +182,23 @@ class ReaderStatsRead(SQLModel):
 
 class LocationCreate(SQLModel):
     room: str
-    unit: str
-    shelf: str
+    unit: str = ""
+    shelf: str = ""
+
+    @field_validator("room")
+    @classmethod
+    def room_must_not_be_blank(cls, value: str) -> str:
+        stripped = (value or "").strip()
+        if not stripped:
+            raise ValueError("room must not be blank")
+        return stripped
+
+    @field_validator("unit", "shelf", mode="before")
+    @classmethod
+    def blank_unit_shelf(cls, value: object) -> str:
+        if value is None:
+            return ""
+        return str(value).strip()
 
 
 class LocationRead(SQLModel):

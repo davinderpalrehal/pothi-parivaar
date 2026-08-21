@@ -1,12 +1,35 @@
 from typing import Optional
 from sqlmodel import Session, select, or_
 from app.models import Book, BookCreate, BookUpdate, ReadingSession
+from app.services.location_service import upsert_location
+
+
+def _strip_optional_str(value: Optional[str]) -> Optional[str]:
+    if value is None:
+        return None
+    stripped = value.strip()
+    return stripped if stripped else None
+
+
+def _apply_location_strip(book: Book) -> None:
+    book.location_room = _strip_optional_str(book.location_room)
+    book.location_unit = _strip_optional_str(book.location_unit)
+    book.location_shelf = _strip_optional_str(book.location_shelf)
+
+
+def _sync_location_registry(session: Session, book: Book) -> None:
+    room = book.location_room or ""
+    if not room:
+        return
+    upsert_location(session, room, book.location_unit or "", book.location_shelf or "")
 
 
 def create_book(session: Session, book_in: BookCreate) -> Book:
     """Create a new book record. Does not call ISBN lookup."""
     book = Book.model_validate(book_in)
+    _apply_location_strip(book)
     session.add(book)
+    _sync_location_registry(session, book)
     session.commit()
     session.refresh(book)
     return book
@@ -82,7 +105,9 @@ def update_book(session: Session, book: Book, book_update: BookUpdate) -> Book:
     update_data = book_update.model_dump(exclude_unset=True)
     for field, value in update_data.items():
         setattr(book, field, value)
+    _apply_location_strip(book)
     session.add(book)
+    _sync_location_registry(session, book)
     session.commit()
     session.refresh(book)
     return book
