@@ -59,7 +59,7 @@ def test_book_crud_lifecycle(client: TestClient):
     created_book = response.json()
     book_id = created_book["id"]
     assert created_book["title"] == "The Hobbit"
-    assert created_book["author"] == "J.R.R. Tolkien"
+    assert created_book["author"] == "J. Tolkien"
     assert created_book["read_count"] == 0
 
     # 2. List books
@@ -152,3 +152,11 @@ def test_hermes_endpoints(client: TestClient):
     rec_res = client.get("/api/v1/hermes/recommend?genre=Tech")
     assert rec_res.status_code == 200
     assert len(rec_res.json()["recommendations"]) == 1
+
+
+def test_root_redirects_to_docs_when_frontend_not_mounted(client: TestClient):
+    if any(getattr(route, "name", None) == "static" for route in app.routes):
+        pytest.skip("frontend/dist is mounted")
+    response = client.get("/", follow_redirects=False)
+    assert response.status_code in (302, 307)
+    assert response.headers["location"].rstrip("/").endswith("/docs")

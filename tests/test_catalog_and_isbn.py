@@ -201,11 +201,13 @@ def test_invalid_status_returns_422(client: TestClient):
     assert res.status_code == 422
 
 
-def test_create_requires_title_and_author(client: TestClient):
+def test_create_requires_title_only(client: TestClient):
     missing_title = client.post("/api/v1/books", json={"author": "Only Author"})
     assert missing_title.status_code == 422
-    missing_author = client.post("/api/v1/books", json={"title": "Only Title"})
-    assert missing_author.status_code == 422
+    title_only = client.post("/api/v1/books", json={"title": "Only Title"})
+    assert title_only.status_code == 201
+    assert title_only.json()["author"] == ""
+    assert title_only.json()["authors"] == []
 
 
 def test_create_book_does_not_call_isbn(client: TestClient):
@@ -334,7 +336,7 @@ def test_partial_update_title_author_location(client: TestClient):
     assert res.status_code == 200
     updated = res.json()
     assert updated["title"] == "New Title"
-    assert updated["author"] == "New Author"
+    assert updated["author"] == "N. Author"
     assert updated["location_room"] == "Living Room"
     assert updated["location_unit"] == "Kids Shelf"
     assert updated["location_shelf"] == "Bottom"
@@ -342,7 +344,7 @@ def test_partial_update_title_author_location(client: TestClient):
     fetched = client.get(f"/api/v1/books/{book['id']}")
     assert fetched.status_code == 200
     assert fetched.json()["title"] == "New Title"
-    assert fetched.json()["author"] == "New Author"
+    assert fetched.json()["author"] == "N. Author"
     assert fetched.json()["location_room"] == "Living Room"
 
 

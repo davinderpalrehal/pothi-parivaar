@@ -2,6 +2,7 @@ from typing import Generator
 from sqlalchemy import event, Engine
 from sqlmodel import SQLModel, create_engine, Session
 from app.config import settings
+from app.services.author_migration import migrate_book_author_strings
 from app.services.location_service import LOCATION_TRIPLE_INDEX_SQL
 
 # Create SQLite engine
@@ -95,6 +96,22 @@ def migrate_schema(db_engine: Engine) -> None:
                 """
             )
             connection.exec_driver_sql(LOCATION_TRIPLE_INDEX_SQL)
+
+        if book_table:
+            book_columns = {
+                row[1] for row in connection.exec_driver_sql("PRAGMA table_info(book)")
+            }
+            if "publisher_id" not in book_columns:
+                connection.exec_driver_sql(
+                    "ALTER TABLE book ADD COLUMN publisher_id INTEGER"
+                )
+        bookauthor_table = connection.exec_driver_sql(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name='bookauthor'"
+        ).first()
+
+    if book_table and bookauthor_table:
+        with Session(db_engine) as session:
+            migrate_book_author_strings(session)
 
 
 def init_db() -> None:

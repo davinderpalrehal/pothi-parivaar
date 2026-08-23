@@ -5,7 +5,6 @@ from sqlmodel import Session, select
 from app.database import get_session
 from app.models import (
     Book,
-    BookRead,
     Reader,
     ReaderCreate,
     ReaderRead,
@@ -17,6 +16,7 @@ from app.models import (
     ReaderActivityRead,
     ReaderStatsRead,
 )
+from app.services.book_service import to_book_read
 
 router = APIRouter(prefix="/readers", tags=["Readers"])
 
@@ -105,7 +105,7 @@ def get_family_activity(session: Session = Depends(get_session)) -> list[ReaderA
                 notes=rs.notes,
                 rating=rs.rating,
                 reader=ReaderRead.model_validate(reader),
-                book=BookRead.model_validate(book),
+                book=to_book_read(session, book),
                 progress_percent=progress_pct,
             )
         )
@@ -204,7 +204,7 @@ def get_reader_stats(reader_id: int, session: Session = Depends(get_session)) ->
     reader_dto = ReaderRead.model_validate(reader)
 
     for rs, book in results:
-        book_dto = BookRead.model_validate(book)
+        book_dto = to_book_read(session, book)
         progress_pct = 0.0
         if book.page_count and book.page_count > 0:
             progress_pct = round(min(100.0, (rs.current_page / book.page_count) * 100), 1)
