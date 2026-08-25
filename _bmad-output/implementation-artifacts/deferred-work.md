@@ -21,3 +21,15 @@
 - source_spec: `/Users/davinderpalrehal/Projects/pothi-parivaar/_bmad-output/implementation-artifacts/spec-fr-7-8-13-locations-formats-recommend.md`
   summary: No automated frontend tests for location combobox cascade (empty unit/shelf still selectable).
   evidence: Repo has no Vue test runner; coverage is API-only in tests/test_locations.py.
+
+- source_spec: `/Users/davinderpalrehal/Projects/pothi-parivaar/_bmad-output/implementation-artifacts/spec-1-2-author-add-edit-ui.md`
+  summary: Optional publisher name field on Add Book and Book Detail.
+  evidence: Split from the 1.2 UI spec over the token budget; independently shippable after structured authors save; CAP-8 write UI.
+
+- source_spec: `/Users/davinderpalrehal/Projects/pothi-parivaar/_bmad-output/implementation-artifacts/spec-1-2-author-add-edit-ui.md`
+  summary: Dedicated mononym control (checkbox or “single name” switch) on author rows.
+  evidence: Split from the 1.2 UI spec over the token budget; last-name field posting a single space is enough for Cher/Plato.
+
+- source_spec: `/Users/davinderpalrehal/Projects/pothi-parivaar/_bmad-output/implementation-artifacts/spec-1-2-author-add-edit-ui.md`
+  summary: No Vue/Playwright tests that mount Add Book or Book Detail and spy createBook/updateBook.
+  evidence: Repo has no Vue test runner; matrix coverage is frontend/src/utils/authors.test.js plus pytest API tests.

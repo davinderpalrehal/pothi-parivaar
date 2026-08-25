@@ -75,7 +75,7 @@
           <v-card-text class="pt-4">
             <v-form ref="formRef" v-model="isFormValid">
               <v-row density="compact">
-                <v-col cols="12" sm="8">
+                <v-col cols="12">
                   <v-text-field
                     v-model="form.title"
                     label="Book Title *"
@@ -85,15 +85,9 @@
                     required
                   ></v-text-field>
                 </v-col>
-                <v-col cols="12" sm="4">
-                  <v-text-field
-                    v-model="form.author"
-                    label="Author *"
-                    :rules="[v => !!v || 'Author is required']"
-                    variant="outlined"
-                    density="comfortable"
-                    required
-                  ></v-text-field>
+
+                <v-col cols="12">
+                  <AuthorRows v-model="form.authors" />
                 </v-col>
 
                 <v-col cols="12" sm="4">
@@ -228,7 +222,7 @@
           color="primary"
           variant="tonal"
           :loading="isSaving"
-          :disabled="isSaving || !form.title || !form.author"
+          :disabled="isSaving || !form.title || hasIncompleteAuthors"
           @click="submitAndAddNext"
         >
           Save & Add Next
@@ -237,7 +231,7 @@
           color="primary"
           variant="flat"
           :loading="isSaving"
-          :disabled="isSaving || !form.title || !form.author"
+          :disabled="isSaving || !form.title || hasIncompleteAuthors"
           @click="submit"
         >
           Save to Library
@@ -250,6 +244,8 @@
 <script setup>
 import { ref, reactive, computed, watch } from 'vue'
 import api from '../services/api'
+import AuthorRows from './AuthorRows.vue'
+import { authorsPayload, emptyAuthorRow, hasIncompleteAuthorRows } from '../utils/authors'
 
 const props = defineProps({
   modelValue: Boolean,
@@ -269,7 +265,7 @@ const submitError = ref('')
 
 const defaultForm = () => ({
   title: '',
-  author: '',
+  authors: [emptyAuthorRow()],
   publication_year: null,
   page_count: null,
   isbn: '',
@@ -283,6 +279,7 @@ const defaultForm = () => ({
 })
 
 const form = reactive(defaultForm())
+const hasIncompleteAuthors = computed(() => hasIncompleteAuthorRows(form.authors))
 
 function locationFilter(value, query) {
   if (!query || !String(query).trim()) return true
@@ -361,7 +358,6 @@ async function handleLookupISBN() {
     if (res.data) {
       const data = res.data
       form.title = data.title || form.title
-      form.author = data.author || form.author
       form.publication_year = data.publication_year || form.publication_year
       form.page_count = data.page_count || form.page_count
       form.isbn = data.isbn || isbnInput.value
@@ -383,7 +379,8 @@ async function handleLookupISBN() {
 }
 
 function createPayload() {
-  const payload = { ...form }
+  const { authors, ...rest } = form
+  const payload = { ...rest, authors: authorsPayload(authors) }
   const textFields = [
     'isbn',
     'location_room',
@@ -408,14 +405,21 @@ async function persistBook() {
   tab.value = 'manual'
   submitError.value = ''
 
-  let valid = Boolean(form.title && form.author)
+  if (!form.title) {
+    submitError.value = 'Title is required.'
+    return false
+  }
+  if (hasIncompleteAuthors.value) {
+    submitError.value = 'Each author needs a first and last name. Use a single space as the last name for a one-word name.'
+    return false
+  }
   if (formRef.value) {
     const result = await formRef.value.validate()
-    valid = result === true || result?.valid === true
-  }
-  if (!valid || !form.title || !form.author) {
-    submitError.value = 'Title and author are required.'
-    return false
+    const valid = result === true || result?.valid === true
+    if (!valid) {
+      submitError.value = 'Please fix the highlighted fields.'
+      return false
+    }
   }
 
   isSaving.value = true

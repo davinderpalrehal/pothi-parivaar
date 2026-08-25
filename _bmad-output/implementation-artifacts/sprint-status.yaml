@@ -29,7 +29,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 # - Retrospective appends its action items to action_items; the status view surfaces open ones
 generated: 08-23-2026 17:20
-last_updated: 08-23-2026 17:26
+last_updated: 08-25-2026 20:45
 project: Pothi Parivaar
 project_key: NOKEY
 tracking_system: file-system
@@ -38,6 +38,6 @@ story_location:
 development_status:
   epic-1: in-progress
   1-1-author-publisher-persistence: review
-  1-2-author-add-edit-ui: backlog
+  1-2-author-add-edit-ui: review
   1-3-isbn-author-name-split: backlog
   epic-1-retrospective: optional
