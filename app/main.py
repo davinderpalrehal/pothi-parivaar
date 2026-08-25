@@ -2,6 +2,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
 from app.api import books, readers, locations, isbn, hermes
@@ -54,6 +55,16 @@ app.include_router(locations.router, prefix="/api")
 app.include_router(isbn.router, prefix="/api")
 app.include_router(hermes.router, prefix="/api")
 
-# Serve frontend static assets in production if directory exists
-if STATIC_DIR.exists() and (STATIC_DIR / "index.html").exists():
+# Production: one process on :8000 can serve the Vue build from frontend/dist.
+# Local `python run.py` leaves this off so :8000 is API-only and / goes to /docs.
+if (
+    settings.serve_frontend
+    and STATIC_DIR.exists()
+    and (STATIC_DIR / "index.html").exists()
+):
     app.mount("/", StaticFiles(directory=str(STATIC_DIR), html=True), name="static")
+else:
+
+    @app.get("/", include_in_schema=False)
+    def root_to_docs() -> RedirectResponse:
+        return RedirectResponse(url="/docs")

@@ -1,0 +1,37 @@
+- id: "1"
+  title: Author publisher persistence
+  description: >-
+    CAP-1, CAP-2, CAP-4, CAP-6, CAP-7, CAP-8 and read-side CAP-3: author and
+    publisher records, book links, API, one-time migration, search/Hermes.
+    Reads still expose a derived author short form so current cards keep working.
+  spec_checkpoint: false
+  done_checkpoint: false
+  invoke_dev_with: >-
+    Implement from _bmad-output/specs/spec-structured-authors/ (SPEC.md,
+    name-rules.md, publishers.md, brownfield.md). Do not change Add Book /
+    Book Detail forms in this story. Do not invent first names from D. Carnegie.
+    Do not attach publishers from ISBN. Highest sprint priority — do this first.
+
+- id: "2"
+  title: Author add edit UI
+  description: >-
+    CAP-1, CAP-2, CAP-3, CAP-8: Add Book and Book Detail use structured author
+    fields and an optional publisher. Zero authors allowed. Mononyms display
+    as Plato, Madonna, Cher.
+  spec_checkpoint: false
+  done_checkpoint: false
+  invoke_dev_with: >-
+    Vuetify 3 only. Depends on story 1 API. Follow name-rules.md for short form
+    and mononym display. Publisher is a single optional name, not required.
+
+- id: "3"
+  title: ISBN author name split
+  description: >-
+    CAP-5: ISBN lookup prefills structured authors using name-rules.md
+    (comma then space split). Fields stay editable; lookup does not persist
+    a book or create publishers.
+  spec_checkpoint: false
+  done_checkpoint: false
+  invoke_dev_with: >-
+    Keep AD-4: POST /books must not call ISBN. Prefill only. Same split as
+    the story 1 migration. Unknown Author splits to first=Unknown last=Author.

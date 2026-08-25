@@ -32,6 +32,9 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
+# Local deploy overrides (host/user). Copy from comments in scripts/deploy.sh
+scripts/deploy.env
+
 # Database & runtime data
 data/*.db
 data/*.sqlite
