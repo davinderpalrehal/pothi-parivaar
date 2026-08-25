@@ -12,7 +12,7 @@
       <v-card-text class="pt-4">
         <v-form v-if="isEditing" ref="editFormRef" v-model="isEditValid">
           <v-row density="compact">
-            <v-col cols="12" sm="8">
+            <v-col cols="12">
               <v-text-field
                 v-model="editForm.title"
                 label="Book Title *"
@@ -21,14 +21,8 @@
                 density="comfortable"
               ></v-text-field>
             </v-col>
-            <v-col cols="12" sm="4">
-              <v-text-field
-                v-model="editForm.author"
-                label="Author *"
-                :rules="[v => !!v || 'Author is required']"
-                variant="outlined"
-                density="comfortable"
-              ></v-text-field>
+            <v-col cols="12">
+              <AuthorRows v-model="editForm.authors" />
             </v-col>
             <v-col cols="12" sm="4">
               <v-text-field
@@ -260,7 +254,7 @@
           <v-btn v-if="!isEditing" color="primary" variant="tonal" prepend-icon="mdi-pencil" class="mr-2" @click="startEdit">
             Edit
           </v-btn>
-          <v-btn v-if="isEditing" color="primary" variant="flat" :loading="isSaving" :disabled="isSaving" @click="saveEdit">
+          <v-btn v-if="isEditing" color="primary" variant="flat" :loading="isSaving" :disabled="isSaving || !editForm.title || hasIncompleteAuthors" @click="saveEdit">
             Save Changes
           </v-btn>
           <v-btn v-else color="primary" variant="tonal" @click="$emit('update:modelValue', false)">
@@ -292,6 +286,8 @@
 <script setup>
 import { computed, reactive, ref, watch } from 'vue'
 import api from '../services/api'
+import AuthorRows from './AuthorRows.vue'
+import { authorsPayload, emptyAuthorRow, hasIncompleteAuthorRows, hydrateAuthorRows } from '../utils/authors'
 
 const props = defineProps({
   modelValue: Boolean,
@@ -390,10 +386,12 @@ const selectedReaderAlreadyReading = computed(() => {
   )
 })
 
+const hasIncompleteAuthors = computed(() => hasIncompleteAuthorRows(editForm.authors))
+
 function emptyEditForm() {
   return {
     title: '',
-    author: '',
+    authors: [emptyAuthorRow()],
     publication_year: null,
     page_count: null,
     isbn: '',
@@ -420,7 +418,7 @@ function startEdit() {
   if (!props.book) return
   Object.assign(editForm, emptyEditForm(), {
     title: props.book.title || '',
-    author: props.book.author || '',
+    authors: hydrateAuthorRows(props.book.authors),
     publication_year: props.book.publication_year ?? null,
     page_count: props.book.page_count ?? null,
     isbn: props.book.isbn || '',
@@ -440,7 +438,8 @@ function cancelEdit() {
 }
 
 function updatePayload() {
-  const payload = { ...editForm }
+  const { authors, ...rest } = editForm
+  const payload = { ...rest, authors: authorsPayload(authors) }
   const textFields = [
     'isbn',
     'location_room',
@@ -462,14 +461,21 @@ function updatePayload() {
 
 async function saveEdit() {
   if (!props.book || isSaving.value) return
-  let valid = Boolean(editForm.title && editForm.author)
+  if (!editForm.title) {
+    notify('Title is required')
+    return
+  }
+  if (hasIncompleteAuthors.value) {
+    notify('Each author needs a first and last name. Use a single space as the last name for a one-word name.')
+    return
+  }
   if (editFormRef.value) {
     const result = await editFormRef.value.validate()
-    valid = result === true || result?.valid === true
-  }
-  if (!valid || !editForm.title || !editForm.author) {
-    notify('Title and author are required')
-    return
+    const valid = result === true || result?.valid === true
+    if (!valid) {
+      notify('Please fix the highlighted fields.')
+      return
+    }
   }
   isSaving.value = true
   try {
