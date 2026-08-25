@@ -3,7 +3,6 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlmodel import Session, select
 from app.database import get_session
 from app.models import (
-    Book,
     BookCreate,
     BookRead,
     BookUpdate,
@@ -35,7 +34,7 @@ def list_books(
     session: Session = Depends(get_session),
 ) -> list[BookRead]:
     """Retrieve list of books matching search/filter criteria. Filters combine with AND."""
-    return book_service.list_books(
+    books = book_service.list_books(
         session=session,
         query=q,
         genre=genre,
@@ -45,6 +44,7 @@ def list_books(
         offset=offset,
         limit=limit,
     )
+    return [book_service.to_book_read(session, book) for book in books]
 
 
 @router.post("", response_model=BookRead, status_code=status.HTTP_201_CREATED)
@@ -53,7 +53,8 @@ def create_book(
     session: Session = Depends(get_session),
 ) -> BookRead:
     """Create a new book record in the catalog."""
-    return book_service.create_book(session, book_in)
+    book = book_service.create_book(session, book_in)
+    return book_service.to_book_read(session, book)
 
 
 @router.get("/{book_id}", response_model=BookRead)
@@ -68,7 +69,7 @@ def get_book(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Book with id {book_id} not found",
         )
-    return book
+    return book_service.to_book_read(session, book)
 
 
 @router.put("/{book_id}", response_model=BookRead)
@@ -84,7 +85,8 @@ def update_book(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Book with id {book_id} not found",
         )
-    return book_service.update_book(session, book, book_in)
+    updated = book_service.update_book(session, book, book_in)
+    return book_service.to_book_read(session, updated)
 
 
 @router.delete("/{book_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -121,7 +123,7 @@ def get_book_reading_sessions(
         .order_by(ReadingSession.start_date.desc())
     )
     results = session.exec(statement).all()
-    book_dto = BookRead.model_validate(book)
+    book_dto = book_service.to_book_read(session, book)
     items: list[ReaderActivityRead] = []
     for rs, reader in results:
         progress_pct = 0.0

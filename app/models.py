@@ -8,10 +8,23 @@ from sqlmodel import SQLModel, Field
 # Database Table Models
 # ==============================================================================
 
+class Publisher(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    name: str = Field(index=True)
+
+
+class Author(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    first_name: str = Field(index=True)
+    middle_name: Optional[str] = Field(default=None, index=True)
+    last_name: str = Field(index=True)
+
+
 class Book(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     title: str = Field(index=True)
-    author: str = Field(index=True)
+    author: str = Field(default="", index=True)  # derived short-form projection
+    publisher_id: Optional[int] = Field(default=None, foreign_key="publisher.id")
     publication_year: Optional[int] = None
     isbn: Optional[str] = Field(default=None, index=True)
     summary: Optional[str] = None
@@ -24,6 +37,12 @@ class Book(SQLModel, table=True):
     location_shelf: Optional[str] = None
     read_count: int = Field(default=0)
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class BookAuthor(SQLModel, table=True):
+    book_id: int = Field(foreign_key="book.id", primary_key=True)
+    author_id: int = Field(foreign_key="author.id", primary_key=True)
+    display_order: int = Field(default=0)
 
 
 class Reader(SQLModel, table=True):
@@ -57,9 +76,55 @@ class Location(SQLModel, table=True):
 # Request / Response Schemas
 # ==============================================================================
 
+class AuthorInput(SQLModel):
+    first_name: str
+    last_name: str
+    middle_name: Optional[str] = None
+
+    @field_validator("first_name")
+    @classmethod
+    def first_name_required(cls, value: str) -> str:
+        stripped = (value or "").strip()
+        if not stripped:
+            raise ValueError("first name is required")
+        return stripped
+
+    @field_validator("last_name")
+    @classmethod
+    def last_name_required(cls, value: str) -> str:
+        if value == " ":
+            return value
+        stripped = (value or "").strip()
+        if not stripped:
+            raise ValueError("last name is required")
+        return stripped
+
+    @field_validator("middle_name")
+    @classmethod
+    def middle_name_optional(cls, value: Optional[str]) -> Optional[str]:
+        if value is None:
+            return None
+        stripped = value.strip()
+        return stripped or None
+
+
+class AuthorRead(SQLModel):
+    id: int
+    first_name: str
+    last_name: str
+    middle_name: Optional[str] = None
+
+
+class PublisherRead(SQLModel):
+    id: int
+    name: str
+
+
 class BookCreate(SQLModel):
     title: str
-    author: str
+    author: Optional[str] = None
+    authors: Optional[list[AuthorInput]] = None
+    publisher_name: Optional[str] = None
     publication_year: Optional[int] = None
     isbn: Optional[str] = None
     summary: Optional[str] = None
@@ -75,6 +140,8 @@ class BookCreate(SQLModel):
 class BookUpdate(SQLModel):
     title: Optional[str] = None
     author: Optional[str] = None
+    authors: Optional[list[AuthorInput]] = None
+    publisher_name: Optional[str] = None
     publication_year: Optional[int] = None
     isbn: Optional[str] = None
     summary: Optional[str] = None
@@ -92,6 +159,8 @@ class BookRead(SQLModel):
     id: int
     title: str
     author: str
+    authors: list[AuthorRead] = []
+    publisher: Optional[PublisherRead] = None
     publication_year: Optional[int] = None
     isbn: Optional[str] = None
     summary: Optional[str] = None

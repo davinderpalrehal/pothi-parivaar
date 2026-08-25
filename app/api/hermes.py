@@ -3,6 +3,7 @@ from fastapi import APIRouter, Depends, Query
 from sqlmodel import Session, select, func
 from app.database import get_session
 from app.models import Book, Reader, ReadingSession
+from app.services.book_service import author_name_book_id_query
 from app.services.recommend import get_recommendations
 
 router = APIRouter(prefix="/hermes", tags=["Hermes Agent"])
@@ -95,7 +96,9 @@ def locate_book(
     pattern = f"%{book_query}%"
     books = session.exec(
         select(Book).where(
-            Book.title.ilike(pattern) | Book.author.ilike(pattern)
+            Book.title.ilike(pattern)
+            | Book.author.ilike(pattern)
+            | Book.id.in_(author_name_book_id_query(pattern))
         )
     ).all()
 
