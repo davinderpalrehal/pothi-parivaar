@@ -373,6 +373,17 @@ def test_migrate_schema_adds_publisher_id_to_legacy_book():
             row[1] for row in connection.exec_driver_sql("PRAGMA table_info(book)")
         }
         assert "publisher_id" in column_names
+        assert "lcc_call_number" in column_names
+        assert "cutter_number" in column_names
+
+        index_names = {
+            row[0]
+            for row in connection.exec_driver_sql(
+                "SELECT name FROM sqlite_master WHERE type='index' AND tbl_name='book'"
+            )
+        }
+        assert "ix_book_lcc_call_number" in index_names
+        assert "ix_book_cutter_number" in index_names
 
     with Session(legacy_engine) as session:
         def get_session_override():

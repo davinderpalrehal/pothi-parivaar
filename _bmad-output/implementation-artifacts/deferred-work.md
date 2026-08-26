@@ -33,3 +33,23 @@
 - source_spec: `/Users/davinderpalrehal/Projects/pothi-parivaar/_bmad-output/implementation-artifacts/spec-1-2-author-add-edit-ui.md`
   summary: No Vue/Playwright tests that mount Add Book or Book Detail and spy createBook/updateBook.
   evidence: Repo has no Vue test runner; matrix coverage is frontend/src/utils/authors.test.js plus pytest API tests.
+
+## Deferred from: code review of spec-2-1-lcc-cutter-shelf-key.md (2026-08-26)
+
+- source_spec: `/Users/davinderpalrehal/Projects/pothi-parivaar/_bmad-output/implementation-artifacts/spec-2-1-lcc-cutter-shelf-key.md`
+  summary: Title-based Cutter source doesn't strip leading articles ("A"/"An"/"The") before computing the code.
+  evidence: Zero-author books Cutter off the raw title (e.g. "A Brief History of Time" Cutters from "A"), diverging from conventional Cutter-table practice; spec explicitly allows a non-authoritative heuristic, so this is a future refinement, not a defect.
+
+- source_spec: `/Users/davinderpalrehal/Projects/pothi-parivaar/_bmad-output/implementation-artifacts/spec-2-1-lcc-cutter-shelf-key.md`
+  summary: suggest_cutter strips non-ASCII/diacritic characters (e.g. "García" -> "Garca") instead of transliterating, with no test coverage for accented, hyphenated, or apostrophe'd names.
+  evidence: A family/small-library catalog plausibly holds non-English author names; spec scoped the algorithm as heuristic-only, so this is a robustness improvement, not a spec violation.
+
+- source_spec: `/Users/davinderpalrehal/Projects/pothi-parivaar/_bmad-output/implementation-artifacts/spec-2-1-lcc-cutter-shelf-key.md`
+  summary: No collision avoidance when two different books resolve to the same LCC class + Cutter code.
+  evidence: Real Cutter tables exist to keep works uniquely ordered within a class; this heuristic MVP has no uniqueness check. Not required by the story's AC or the user's "smaller mapping table" scope decision.
+
+- source_spec: `/Users/davinderpalrehal/Projects/pothi-parivaar/_bmad-output/implementation-artifacts/spec-2-1-lcc-cutter-shelf-key.md`
+  summary: ClassifySuggestDialog's suggestion fetch has no request-ordering guard, so a slow response could overwrite a newer one if the dialog is reopened quickly for a different book.
+  evidence: Low likelihood in single-family/single-user usage; worth hardening if the app ever supports concurrent multi-user editing.
+
+- Frontend has no test runner or framework configured anywhere in the repo (only `frontend/src/utils/authors.test.js` exists, no `test` script in `frontend/package.json`), so the new `ClassifySuggestDialog.vue` and the call-number badges have no executable frontend verification. Pre-existing project-wide gap, not introduced by this story — surfaced incidentally while reviewing the new UI.

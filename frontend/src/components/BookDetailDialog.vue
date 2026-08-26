@@ -155,6 +155,23 @@
               <v-chip v-if="book.page_count" size="small" variant="text">
                 {{ book.page_count }} pages
               </v-chip>
+              <v-chip
+                v-if="book.lcc_call_number && book.cutter_number"
+                size="small"
+                color="indigo"
+                variant="tonal"
+                prepend-icon="mdi-pound-box-outline"
+              >
+                {{ book.lcc_call_number }} {{ book.cutter_number }}
+              </v-chip>
+              <v-btn
+                size="x-small"
+                variant="outlined"
+                prepend-icon="mdi-bookshelf"
+                @click="showClassifyDialog = true"
+              >
+                Classify
+              </v-btn>
             </div>
 
             <div v-if="book.genres_tags" class="text-caption text-grey-darken-1 mb-1">
@@ -268,6 +285,12 @@
     </v-snackbar>
   </v-dialog>
 
+  <ClassifySuggestDialog
+    v-model="showClassifyDialog"
+    :book="book"
+    @refresh="onClassifyConfirmed"
+  />
+
   <v-dialog v-model="showDeleteConfirm" max-width="420" persistent>
     <v-card>
       <v-card-title class="text-subtitle-1 font-weight-bold">Delete this book?</v-card-title>
@@ -287,6 +310,7 @@
 import { computed, reactive, ref, watch } from 'vue'
 import api from '../services/api'
 import AuthorRows from './AuthorRows.vue'
+import ClassifySuggestDialog from './ClassifySuggestDialog.vue'
 import { authorsPayload, emptyAuthorRow, hasIncompleteAuthorRows, hydrateAuthorRows } from '../utils/authors'
 
 const props = defineProps({
@@ -306,6 +330,7 @@ const isSaving = ref(false)
 const isDeleting = ref(false)
 const isEditValid = ref(false)
 const showDeleteConfirm = ref(false)
+const showClassifyDialog = ref(false)
 const editFormRef = ref(null)
 const snackbar = ref({ show: false, text: '', color: 'error' })
 
@@ -521,6 +546,7 @@ watch(
     if (val && bookId) {
       isEditing.value = false
       showDeleteConfirm.value = false
+      showClassifyDialog.value = false
       loadLocationOptions()
       loadData()
     } else if (val) {
@@ -551,6 +577,10 @@ async function startReading() {
   } finally {
     isStarting.value = false
   }
+}
+
+function onClassifyConfirmed(updatedBook) {
+  emit('refresh', updatedBook)
 }
 
 async function confirmDelete() {

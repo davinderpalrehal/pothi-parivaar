@@ -105,6 +105,20 @@ def migrate_schema(db_engine: Engine) -> None:
                 connection.exec_driver_sql(
                     "ALTER TABLE book ADD COLUMN publisher_id INTEGER"
                 )
+            if "lcc_call_number" not in book_columns:
+                connection.exec_driver_sql(
+                    "ALTER TABLE book ADD COLUMN lcc_call_number VARCHAR"
+                )
+            if "cutter_number" not in book_columns:
+                connection.exec_driver_sql(
+                    "ALTER TABLE book ADD COLUMN cutter_number VARCHAR"
+                )
+            connection.exec_driver_sql(
+                "CREATE INDEX IF NOT EXISTS ix_book_lcc_call_number ON book (lcc_call_number)"
+            )
+            connection.exec_driver_sql(
+                "CREATE INDEX IF NOT EXISTS ix_book_cutter_number ON book (cutter_number)"
+            )
         bookauthor_table = connection.exec_driver_sql(
             "SELECT name FROM sqlite_master WHERE type='table' AND name='bookauthor'"
         ).first()

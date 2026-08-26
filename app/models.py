@@ -37,6 +37,10 @@ class Book(SQLModel, table=True):
     location_shelf: Optional[str] = None
     read_count: int = Field(default=0)
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    # New fields for LCC call number and Cutter
+    lcc_call_number: Optional[str] = Field(default=None, index=True)
+    cutter_number: Optional[str] = Field(default=None, index=True)
+
 
 
 class BookAuthor(SQLModel, table=True):
@@ -153,6 +157,8 @@ class BookUpdate(SQLModel):
     location_unit: Optional[str] = None
     location_shelf: Optional[str] = None
     read_count: Optional[int] = None
+    lcc_call_number: Optional[str] = None
+    cutter_number: Optional[str] = None
 
 
 class BookRead(SQLModel):
@@ -173,6 +179,17 @@ class BookRead(SQLModel):
     location_shelf: Optional[str] = None
     read_count: int = 0
     created_at: datetime
+    lcc_call_number: Optional[str] = None
+    cutter_number: Optional[str] = None
+
+
+class ClassificationSuggestRequest(SQLModel):
+    primary_author_id: Optional[int] = None
+
+
+class ClassificationSuggestion(SQLModel):
+    lcc_call_number: str
+    cutter_number: str
 
 
 class ReaderCreate(SQLModel):

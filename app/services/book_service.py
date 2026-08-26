@@ -197,6 +197,8 @@ def to_book_read(session: Session, book: Book) -> BookRead:
         location_shelf=book.location_shelf,
         read_count=book.read_count,
         created_at=book.created_at,
+        lcc_call_number=book.lcc_call_number,
+        cutter_number=book.cutter_number,
     )
 
 
