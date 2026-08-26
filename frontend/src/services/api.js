@@ -32,6 +32,10 @@ export default {
   getBookSessions(bookId) {
     return apiClient.get(`/books/${bookId}/sessions`)
   },
+  suggestClassification(bookId, primaryAuthorId = null) {
+    const payload = primaryAuthorId != null ? { primary_author_id: primaryAuthorId } : {}
+    return apiClient.post(`/books/${bookId}/classification/suggest`, payload)
+  },
 
   // Readers
   getReaders() {

@@ -41,6 +41,15 @@
           {{ book.formats || 'physical' }}
         </v-chip>
         <v-chip
+          v-if="callNumberDisplay"
+          size="x-small"
+          color="indigo"
+          variant="tonal"
+          prepend-icon="mdi-pound-box-outline"
+        >
+          {{ callNumberDisplay }}
+        </v-chip>
+        <v-chip
           v-if="book.read_count > 0"
           size="x-small"
           color="success"
@@ -102,6 +111,11 @@ const defaultCover = 'https://images.unsplash.com/photo-1543002588-bfa74002ed7e?
 const locationDisplay = computed(() => {
   const parts = [props.book.location_room, props.book.location_unit, props.book.location_shelf].filter(Boolean)
   return parts.length > 0 ? parts.join(' / ') : null
+})
+
+const callNumberDisplay = computed(() => {
+  if (!props.book.lcc_call_number || !props.book.cutter_number) return null
+  return `${props.book.lcc_call_number} ${props.book.cutter_number}`
 })
 </script>
 

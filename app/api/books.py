@@ -1,17 +1,20 @@
 from typing import Literal, Optional
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Body, Depends, HTTPException, Query, status
 from sqlmodel import Session, select
 from app.database import get_session
 from app.models import (
+    AuthorRead,
     BookCreate,
     BookRead,
     BookUpdate,
+    ClassificationSuggestRequest,
+    ClassificationSuggestion,
     Reader,
     ReaderRead,
     ReadingSession,
     ReaderActivityRead,
 )
-from app.services import book_service
+from app.services import book_service, classification_service
 
 router = APIRouter(prefix="/books", tags=["Books"])
 
@@ -102,6 +105,48 @@ def delete_book(
             detail=f"Book with id {book_id} not found",
         )
     book_service.delete_book(session, book)
+
+
+@router.post("/{book_id}/classification/suggest", response_model=ClassificationSuggestion)
+def suggest_classification(
+    book_id: int,
+    request: ClassificationSuggestRequest = Body(default_factory=ClassificationSuggestRequest),
+    session: Session = Depends(get_session),
+) -> ClassificationSuggestion:
+    """Compute a heuristic LCC class + Cutter code suggestion for human review.
+
+    Never auto-persisted: classification is title/genres_tags/authors only
+    (no ISBN lookup) and the client must confirm via PUT /books/{book_id}.
+    """
+    book = book_service.get_book(session, book_id)
+    if not book:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Book with id {book_id} not found",
+        )
+    authors = book_service.list_book_authors(session, book_id)
+    try:
+        return classification_service.suggest_classification(
+            title=book.title,
+            genres_tags=book.genres_tags,
+            authors=authors,
+            primary_author_id=request.primary_author_id,
+        )
+    except classification_service.AmbiguousAuthorError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail={
+                "message": "Book has multiple authors; primary_author_id is required",
+                "authors": [
+                    AuthorRead.model_validate(author).model_dump() for author in exc.authors
+                ],
+            },
+        ) from exc
+    except classification_service.InvalidPrimaryAuthorError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"primary_author_id {exc.primary_author_id} is not linked to this book",
+        ) from exc
 
 
 @router.get("/{book_id}/sessions", response_model=list[ReaderActivityRead])
