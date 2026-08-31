@@ -75,7 +75,7 @@
           <!-- Search & Filter Bar -->
           <v-card class="mb-4 pa-3" elevation="1">
             <v-row density="compact" align="center">
-              <v-col cols="12" sm="6" md="3">
+              <v-col cols="12" sm="10" md="11">
                 <v-text-field
                   v-model="searchQuery"
                   label="Search by title, author, tag, or ISBN..."
@@ -87,7 +87,20 @@
                   @update:model-value="fetchBooks"
                 ></v-text-field>
               </v-col>
-              <v-col cols="6" sm="3" md="2">
+              <v-col cols="12" sm="2" md="1">
+                <v-btn
+                  block
+                  color="primary"
+                  variant="tonal"
+                  height="44"
+                  icon="mdi-refresh"
+                  aria-label="Refresh catalog"
+                  @click="fetchBooks"
+                ></v-btn>
+              </v-col>
+            </v-row>
+            <v-row density="compact" align="center" class="mt-1">
+              <v-col cols="6" sm="4" md="2">
                 <v-text-field
                   v-model="genreFilter"
                   label="Tag/Genre"
@@ -99,7 +112,7 @@
                   @update:model-value="fetchBooks"
                 ></v-text-field>
               </v-col>
-              <v-col cols="6" sm="3" md="2">
+              <v-col cols="6" sm="4" md="2">
                 <v-select
                   v-model="formatFilter"
                   label="Format"
@@ -111,7 +124,7 @@
                   @update:model-value="fetchBooks"
                 ></v-select>
               </v-col>
-              <v-col cols="6" sm="3" md="2">
+              <v-col cols="6" sm="4" md="2">
                 <v-select
                   v-model="statusFilter"
                   label="Status"
@@ -123,7 +136,7 @@
                   @update:model-value="fetchBooks"
                 ></v-select>
               </v-col>
-              <v-col cols="6" sm="3" md="2">
+              <v-col cols="6" sm="4" md="2">
                 <v-text-field
                   v-model="roomFilter"
                   label="Room"
@@ -135,16 +148,18 @@
                   @update:model-value="fetchBooks"
                 ></v-text-field>
               </v-col>
-              <v-col cols="12" sm="3" md="1">
-                <v-btn
-                  block
-                  color="primary"
-                  variant="tonal"
-                  height="44"
-                  icon="mdi-refresh"
-                  aria-label="Refresh catalog"
-                  @click="fetchBooks"
-                ></v-btn>
+              <v-col cols="6" sm="4" md="2">
+                <v-select
+                  v-model="languageFilter"
+                  label="Language"
+                  :items="languageOptions"
+                  prepend-inner-icon="mdi-translate"
+                  variant="outlined"
+                  density="comfortable"
+                  hide-details
+                  clearable
+                  @update:model-value="fetchBooks"
+                ></v-select>
               </v-col>
             </v-row>
           </v-card>
@@ -305,6 +320,7 @@
 <script setup>
 import { ref, onMounted, watch } from 'vue'
 import api from './services/api'
+import { languageFilterOptions, languageFilterParams } from './utils/languages.js'
 import BookCard from './components/BookCard.vue'
 import AddBookDialog from './components/AddBookDialog.vue'
 import BookDetailDialog from './components/BookDetailDialog.vue'
@@ -322,6 +338,10 @@ const genreFilter = ref('')
 const formatFilter = ref(null)
 const statusFilter = ref(null)
 const roomFilter = ref('')
+const languageFilter = ref(null)
+// Derived from the catalog, not from the entry-form shortlist, so a free-entry
+// code is still filterable and no empty language is ever offered.
+const languageOptions = ref([])
 const formatOptions = [
   { title: 'Physical', value: 'physical' },
   { title: 'Kindle', value: 'kindle' },
@@ -354,6 +374,7 @@ async function fetchBooks() {
     const room = (roomFilter.value || '').trim()
     if (room) params.room = room
     if (statusFilter.value) params.status = statusFilter.value
+    Object.assign(params, languageFilterParams(languageFilter.value))
     const booksRes = await api.getBooks(params)
     books.value = booksRes.data
     if (selectedBook.value) {
@@ -404,11 +425,35 @@ function openBookDetail(book) {
   showBookDetail.value = true
 }
 
+async function loadLanguageOptions() {
+  try {
+    const res = await api.getCatalogLanguages()
+    languageOptions.value = languageFilterOptions(res.data)
+
+    // A selection can outlive its option -- give the last unset book a language
+    // and "No language set" disappears from the list. Drop the stale selection
+    // instead of leaving the control showing a value it no longer offers while
+    // filtering the grid to nothing.
+    const stillOffered = languageOptions.value.some(
+      (item) => item.value === languageFilter.value
+    )
+    if (languageFilter.value != null && !stillOffered) {
+      languageFilter.value = null
+      fetchBooks()
+    }
+  } catch (err) {
+    console.error('Failed to fetch catalog languages', err)
+  }
+}
+
 function handleBookSaved(updatedBook) {
   if (updatedBook?.id) {
     selectedBook.value = { ...(selectedBook.value || {}), ...updatedBook }
   }
   fetchBooks()
+  // Editing a language changes the counts, so the dropdown is rebuilt here
+  // rather than going stale until a page reload.
+  loadLanguageOptions()
   if (trackerRef.value) trackerRef.value.loadData()
   if (shelvesRef.value) shelvesRef.value.loadLocations()
 }
@@ -425,5 +470,6 @@ function handleFilterRoom(room) {
 
 onMounted(() => {
   fetchBooks()
+  loadLanguageOptions()
 })
 </script>

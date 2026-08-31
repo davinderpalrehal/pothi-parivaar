@@ -96,3 +96,56 @@ export function languageDetailLabel(language, additionalLanguages) {
   if (!primary) return extras.length ? `Also: ${extras.join(', ')}` : ''
   return extras.length ? `${primary} (also ${extras.join(', ')})` : primary
 }
+
+/**
+ * Sentinel for the "No language set" filter choice. Cannot collide with a real
+ * value: every stored language is exactly three ASCII letters, enforced by the
+ * API validator and by `normalizeLanguage` here.
+ */
+export const MISSING_LANGUAGE_VALUE = '__none__'
+
+/**
+ * Build v-select items from the catalog-languages summary. Titles carry the
+ * count so the librarian can see the size of each group. The "No language set"
+ * entry is appended LAST rather than sorted into the count order -- it is a
+ * different kind of thing from a language, and with most of the collection
+ * unset it would otherwise dominate the top of the list. It is omitted entirely
+ * when nothing is unset.
+ */
+export function languageFilterOptions(summary) {
+  const languages = Array.isArray(summary?.languages) ? summary.languages : []
+
+  const items = languages.map((entry) => ({
+    title: `${languageLabel(entry.code) || entry.code} (${entry.book_count})`,
+    value: normalizeLanguage(entry.code) ?? entry.code,
+  }))
+
+  const missingCount = Number(summary?.missing_count) || 0
+  if (missingCount > 0) {
+    items.push({
+      title: `No language set (${missingCount})`,
+      value: MISSING_LANGUAGE_VALUE,
+    })
+  }
+
+  return items
+}
+
+/**
+ * Map the selected filter value to the query fragment for GET /books. Returns
+ * an empty object when nothing is selected, so a cleared filter sends neither
+ * param -- and never both at once.
+ */
+export function languageFilterParams(value) {
+  if (value === MISSING_LANGUAGE_VALUE) return { missing_language: true }
+
+  const code = normalizeLanguage(value)
+  if (code) return { language: code }
+
+  // The option list comes from the server, which normalizes stored codes but
+  // does not enforce the 3-letter shape on read. Pass an odd code through
+  // rather than send no filter at all -- that would silently show the whole
+  // catalog while the control claims to be filtering.
+  const raw = typeof value === 'string' ? value.trim().toLowerCase() : ''
+  return raw ? { language: raw } : {}
+}

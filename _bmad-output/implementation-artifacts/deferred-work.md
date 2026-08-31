@@ -121,3 +121,9 @@
 - source_spec: `/Users/davinderpalrehal/Projects/pothi-parivaar/_bmad-output/implementation-artifacts/spec-2-3-lcc-class-map.md`
   summary: No table-hygiene test guards DOMAIN_LCC_MAP against duplicate or subsumed keyword entries.
   evidence: Under the original substring matching, "sikhism" was fully covered by the later "sikh", "coloring" by "color", and "maths" by "math" — entries that could never change an outcome. Word-boundary matching makes these meaningful again, but nothing prevents a future entry from being silently unreachable.
+
+## Deferred from: code review of spec-catalog-language-filter.md (2026-08-31)
+
+- source_spec: `/Users/davinderpalrehal/Projects/pothi-parivaar/_bmad-output/implementation-artifacts/spec-catalog-language-filter.md`
+  summary: No executable verification for any App.vue filter behavior — the language param assembly, the two loadLanguageOptions refresh hooks, and the new stale-selection clear are all verified only by reading the code and by hand.
+  evidence: Pure helpers in languages.js are covered by node:test (48 tests), but nothing mounts App.vue, so `Object.assign(params, languageFilterParams(...))` could be replaced with `params.language = languageFilter.value` and the whole suite would stay green. Acceptance criterion "counts reflect the change without a page reload" has no automated check at all. This is a third instance of the repo-wide missing-component-runner gap already recorded from the 2.1 and 1.2 reviews, not a new root cause.

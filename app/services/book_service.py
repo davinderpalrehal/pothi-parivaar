@@ -1,4 +1,5 @@
 from typing import Optional
+from sqlalchemy import func
 from sqlmodel import Session, select, or_, col
 from app.models import (
     Author,
@@ -9,6 +10,8 @@ from app.models import (
     BookCreate,
     BookRead,
     BookUpdate,
+    CatalogLanguagesRead,
+    LanguageSummaryRead,
     Publisher,
     PublisherRead,
     ReadingSession,
@@ -240,6 +243,7 @@ def list_books(
     room: Optional[str] = None,
     book_format: Optional[str] = None,
     language: Optional[str] = None,
+    missing_language: bool = False,
     status: Optional[str] = None,
     offset: int = 0,
     limit: int = 100,
@@ -273,6 +277,13 @@ def list_books(
     if normalized_language:
         statement = statement.where(Book.language == normalized_language)
 
+    # "Missing" is NULL or blank. The write validator only ever stores NULL, but
+    # the filter deliberately does not depend on that holding.
+    if missing_language:
+        statement = statement.where(
+            or_(col(Book.language).is_(None), Book.language == "")
+        )
+
     if status:
         reading_ids = _session_book_ids(session, "reading")
         if status == "reading":
@@ -290,6 +301,35 @@ def list_books(
 
     statement = statement.offset(offset).limit(limit).order_by(Book.id.desc())
     return list(session.exec(statement).all())
+
+
+def catalog_languages(session: Session) -> CatalogLanguagesRead:
+    """Distinct primary languages actually held, with counts, plus the unset count.
+
+    Derived from the data rather than a fixed shortlist, so any well-formed code
+    a human entered is filterable and no empty language is ever offered. Ordered
+    by count descending then code ascending, so the list is deterministic.
+    """
+    rows = session.exec(
+        select(Book.language, func.count(col(Book.id))).group_by(Book.language)
+    ).all()
+
+    counts: dict[str, int] = {}
+    missing_count = 0
+    for code, count in rows:
+        # Normalize on read too, so a stray-cased legacy row merges into one
+        # option instead of appearing twice in the dropdown.
+        normalized = (code or "").strip().lower()
+        if not normalized:
+            missing_count += count
+            continue
+        counts[normalized] = counts.get(normalized, 0) + count
+
+    languages = [
+        LanguageSummaryRead(code=code, book_count=count)
+        for code, count in sorted(counts.items(), key=lambda kv: (-kv[1], kv[0]))
+    ]
+    return CatalogLanguagesRead(languages=languages, missing_count=missing_count)
 
 
 def update_book(session: Session, book: Book, book_update: BookUpdate) -> Book:

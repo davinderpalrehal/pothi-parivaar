@@ -284,3 +284,130 @@ def test_additional_languages_is_trimmed_but_entries_survive_verbatim(
         client, title="X", language="eng", additional_languages="  san, hin  "
     )
     assert created["additional_languages"] == "san, hin"
+
+
+# ==============================================================================
+# Catalog languages endpoint
+# ==============================================================================
+
+def test_catalog_languages_reports_held_codes_with_counts(client: TestClient):
+    _create_book(client, title="A", language="pan")
+    _create_book(client, title="B", language="pan")
+    _create_book(client, title="C", language="eng")
+    _create_book(client, title="D", language="tam")
+    _create_book(client, title="E")
+
+    res = client.get("/api/v1/books/languages")
+    assert res.status_code == 200, res.text
+    assert res.json() == {
+        "languages": [
+            {"code": "pan", "book_count": 2},
+            {"code": "eng", "book_count": 1},
+            {"code": "tam", "book_count": 1},
+        ],
+        "missing_count": 1,
+    }
+
+
+def test_catalog_languages_includes_codes_outside_the_entry_shortlist(
+    client: TestClient,
+):
+    _create_book(client, title="Tamil Book", language="tam")
+
+    res = client.get("/api/v1/books/languages")
+    assert res.status_code == 200
+    assert [entry["code"] for entry in res.json()["languages"]] == ["tam"]
+
+
+def test_catalog_languages_on_an_empty_catalog(client: TestClient):
+    res = client.get("/api/v1/books/languages")
+    assert res.status_code == 200
+    assert res.json() == {"languages": [], "missing_count": 0}
+
+
+def test_catalog_languages_route_is_not_shadowed_by_the_book_id_route(
+    client: TestClient,
+):
+    """`/books/languages` must resolve before `/books/{book_id}`.
+
+    Declared after it, FastAPI parses "languages" as an int book id and 422s.
+    """
+    res = client.get("/api/v1/books/languages")
+    assert res.status_code == 200, res.text
+    assert res.status_code != 422
+    assert "languages" in res.json()
+
+
+def test_catalog_languages_counts_only_the_primary_language(client: TestClient):
+    _create_book(client, title="X", language="eng", additional_languages="pan, san")
+
+    res = client.get("/api/v1/books/languages")
+    assert res.json()["languages"] == [{"code": "eng", "book_count": 1}]
+
+
+# ==============================================================================
+# missing_language filter
+# ==============================================================================
+
+def test_missing_language_filter_returns_only_books_with_no_primary_language(
+    client: TestClient,
+):
+    unset = _create_book(client, title="Unset Book")
+    _create_book(client, title="Punjabi Book", language="pan")
+
+    res = client.get("/api/v1/books", params={"missing_language": "true"})
+    assert res.status_code == 200
+    assert [book["id"] for book in res.json()] == [unset["id"]]
+
+
+def test_missing_language_filter_matches_a_blank_stored_language(
+    session, client: TestClient
+):
+    """The write validator only stores NULL, but the filter must not rely on it."""
+    from app.models import Book
+
+    blank = Book(title="Blank Language", language="")
+    session.add(blank)
+    session.commit()
+    session.refresh(blank)
+
+    res = client.get("/api/v1/books", params={"missing_language": "true"})
+    assert res.status_code == 200
+    assert [book["id"] for book in res.json()] == [blank.id]
+
+
+def test_missing_language_combined_with_language_returns_empty(client: TestClient):
+    _create_book(client, title="Punjabi Book", language="pan")
+    _create_book(client, title="Unset Book")
+
+    res = client.get(
+        "/api/v1/books", params={"language": "pan", "missing_language": "true"}
+    )
+    assert res.status_code == 200
+    assert res.json() == []
+
+
+def test_missing_language_defaults_off_so_the_unfiltered_list_is_unchanged(
+    client: TestClient,
+):
+    _create_book(client, title="Punjabi Book", language="pan")
+    _create_book(client, title="Unset Book")
+
+    baseline = client.get("/api/v1/books")
+    explicit_false = client.get("/api/v1/books", params={"missing_language": "false"})
+
+    assert baseline.status_code == 200
+    assert len(baseline.json()) == 2
+    assert explicit_false.json() == baseline.json()
+
+
+def test_missing_language_combines_with_other_filters(client: TestClient):
+    match = _create_book(client, title="Unset History", genres_tags="History")
+    _create_book(client, title="Unset Fiction", genres_tags="Fiction")
+    _create_book(client, title="Punjabi History", language="pan", genres_tags="History")
+
+    res = client.get(
+        "/api/v1/books", params={"missing_language": "true", "genre": "History"}
+    )
+    assert res.status_code == 200
+    assert [book["id"] for book in res.json()] == [match["id"]]
