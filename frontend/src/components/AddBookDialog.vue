@@ -178,6 +178,33 @@
                     density="comfortable"
                   ></v-select>
                 </v-col>
+                <v-col cols="12" sm="4">
+                  <v-combobox
+                    v-model="form.language"
+                    label="Language"
+                    :items="languageOptions"
+                    :rules="[languageRule]"
+                    item-title="label"
+                    item-value="code"
+                    placeholder="e.g. pan"
+                    hint="ISO 639-3 code; pick one or type your own"
+                    persistent-hint
+                    variant="outlined"
+                    density="comfortable"
+                    clearable
+                  ></v-combobox>
+                </v-col>
+                <v-col cols="12" sm="8">
+                  <v-text-field
+                    v-model="form.additional_languages"
+                    label="Additional Languages (comma separated)"
+                    placeholder="e.g. san, hin"
+                    hint="ISO 639-3 codes, separated by commas"
+                    persistent-hint
+                    variant="outlined"
+                    density="comfortable"
+                  ></v-text-field>
+                </v-col>
 
                 <v-col cols="12">
                   <v-text-field
@@ -246,6 +273,7 @@ import { ref, reactive, computed, watch } from 'vue'
 import api from '../services/api'
 import AuthorRows from './AuthorRows.vue'
 import { authorsPayload, emptyAuthorRow, hasIncompleteAuthorRows } from '../utils/authors'
+import { LANGUAGE_OPTIONS, languageRule, normalizeLanguage } from '../utils/languages'
 
 const props = defineProps({
   modelValue: Boolean,
@@ -274,11 +302,15 @@ const defaultForm = () => ({
   location_shelf: '',
   genres_tags: '',
   formats: 'physical',
+  language: null,
+  additional_languages: '',
   cover_url: '',
   summary: '',
 })
 
 const form = reactive(defaultForm())
+const languageOptions = LANGUAGE_OPTIONS
+
 const hasIncompleteAuthors = computed(() => hasIncompleteAuthorRows(form.authors))
 
 function locationFilter(value, query) {
@@ -387,6 +419,8 @@ function createPayload() {
     'location_unit',
     'location_shelf',
     'genres_tags',
+    'language',
+    'additional_languages',
     'cover_url',
     'summary',
   ]
@@ -397,6 +431,7 @@ function createPayload() {
     const value = payload[key]
     if (value === '' || value === null || Number.isNaN(value)) payload[key] = null
   }
+  payload.language = normalizeLanguage(payload.language)
   return payload
 }
 

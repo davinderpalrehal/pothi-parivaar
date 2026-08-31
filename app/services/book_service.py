@@ -199,6 +199,8 @@ def to_book_read(session: Session, book: Book) -> BookRead:
         created_at=book.created_at,
         lcc_call_number=book.lcc_call_number,
         cutter_number=book.cutter_number,
+        language=book.language,
+        additional_languages=book.additional_languages,
     )
 
 
@@ -237,6 +239,7 @@ def list_books(
     genre: Optional[str] = None,
     room: Optional[str] = None,
     book_format: Optional[str] = None,
+    language: Optional[str] = None,
     status: Optional[str] = None,
     offset: int = 0,
     limit: int = 100,
@@ -265,6 +268,10 @@ def list_books(
 
     if book_format:
         statement = statement.where(Book.formats.ilike(f"%{book_format}%"))
+
+    normalized_language = (language or "").strip().lower()
+    if normalized_language:
+        statement = statement.where(Book.language == normalized_language)
 
     if status:
         reading_ids = _session_book_ids(session, "reading")

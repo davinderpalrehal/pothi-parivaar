@@ -27,6 +27,7 @@ def list_books(
     genre: Optional[str] = Query(None, description="Filter by genre or tag"),
     room: Optional[str] = Query(None, description="Filter by location room"),
     book_format: Optional[str] = Query(None, alias="format", description="Filter by format"),
+    language: Optional[str] = Query(None, description="Filter by primary language (ISO 639-3 code)"),
     reading_status: Optional[CatalogStatus] = Query(
         None,
         alias="status",
@@ -43,6 +44,7 @@ def list_books(
         genre=genre,
         room=room,
         book_format=book_format,
+        language=language,
         status=reading_status,
         offset=offset,
         limit=limit,

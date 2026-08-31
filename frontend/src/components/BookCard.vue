@@ -50,6 +50,15 @@
           {{ callNumberDisplay }}
         </v-chip>
         <v-chip
+          v-if="languageDisplay"
+          size="x-small"
+          color="teal"
+          variant="tonal"
+          prepend-icon="mdi-translate"
+        >
+          {{ languageDisplay }}
+        </v-chip>
+        <v-chip
           v-if="book.read_count > 0"
           size="x-small"
           color="success"
@@ -92,6 +101,7 @@
 
 <script setup>
 import { computed } from 'vue'
+import { languageChipLabel } from '../utils/languages'
 
 const props = defineProps({
   book: {
@@ -117,6 +127,10 @@ const callNumberDisplay = computed(() => {
   if (!props.book.lcc_call_number || !props.book.cutter_number) return null
   return `${props.book.lcc_call_number} ${props.book.cutter_number}`
 })
+
+const languageDisplay = computed(() =>
+  languageChipLabel(props.book.language, props.book.additional_languages)
+)
 </script>
 
 <style scoped>
