@@ -245,6 +245,11 @@ class ClassificationSuggestRequest(SQLModel):
 class ClassificationSuggestion(SQLModel):
     lcc_call_number: str
     cutter_number: str
+    # Describes the *suggestion*, not the book: "genres"/"title" when a keyword
+    # matched, "default" when nothing did and the class is only a fallback.
+    # Never persisted -- the confirm path still PUTs the two fields above.
+    class_source: Literal["genres", "title", "default"] = "default"
+    class_matched_keyword: Optional[str] = None
 
 
 class ReaderCreate(SQLModel):

@@ -89,3 +89,35 @@
 - source_spec: `/Users/davinderpalrehal/Projects/pothi-parivaar/_bmad-output/implementation-artifacts/spec-2-2-book-language-capture.md`
   summary: Language is invisible to the Hermes agent surfaces — app/api/hermes.py hand-builds its response dicts without it, and the free-text q search in list_books does not match on language.
   evidence: Hermes cannot answer "find me a Punjabi book" even though the column now exists; get_library_status also has no per-language counts. Out of scope for 2.2, which never touched the Hermes layer, but the capability gap is real now that the data is being captured.
+
+## Deferred from: LCC class map intent split (2026-08-31)
+
+- source_spec: none
+  summary: Second metadata source for subject/genre coverage — provision a Google Books API key (or equivalent) and merge its subjects into the classification signal alongside OpenLibrary.
+  evidence: Split from the class-map intent as an independently shippable goal; needs API-key provisioning (the unauthenticated endpoint returns 429 on shared-IP quota) and edits app/services/isbn_service.py, which both the deferred jscmd=details language capture and epic-1 story 1-3 isbn-author-name-split also touch. The title-keyword class map ships without it and covers the 37/46 books that have no genres_tags at all.
+
+## Deferred from: code review of spec-2-3-lcc-class-map.md (2026-08-31)
+
+- source_spec: `/Users/davinderpalrehal/Projects/pothi-parivaar/_bmad-output/implementation-artifacts/spec-2-3-lcc-class-map.md`
+  summary: Domain table has no core Sikh vocabulary beyond "guru"/"sikh" — no nanak, granth, ardas, japji, singh, kaur, or waheguru.
+  evidence: Verified against the shipped code: "Nanak Dukhiya Sab Sansar" and "Ardas and Japji" both fall through to a flagged PN. The story deliberately chose "safe generics only" and accepted 7 flagged books, but for a Sikh-majority collection these are domain terms rather than the proper-name matching the spec's Ask First bars. "TERCENTENARY CELEBRATIONS", one of the 7, is very likely a Khalsa tercentenary work.
+
+- source_spec: `/Users/davinderpalrehal/Projects/pothi-parivaar/_bmad-output/implementation-artifacts/spec-2-3-lcc-class-map.md`
+  summary: Book.language is captured but unused as a classification signal, while "punjabi"/"panjabi" sit in the subject table doing language work.
+  evidence: Story 2.2 shipped an indexed ISO 639-3 language column and suggest_classification never reads it. Meanwhile the language tokens classify to PK (Indic literature), so a title like "Punjabi Cooking Made Easy" would classify PK rather than TX — a language token deciding a subject class. Resolving this properly depends on the deferred language-first key ordering work.
+
+- source_spec: `/Users/davinderpalrehal/Projects/pothi-parivaar/_bmad-output/implementation-artifacts/spec-2-3-lcc-class-map.md`
+  summary: Non-Latin-script titles can never match any keyword, so Gurmukhi or Devanagari titles always fall back to a flagged PN.
+  evidence: Matching is lowercase Latin substring/boundary only. The story 2.2 analysis established every current title is Latin script (romanized Punjabi included), so this is latent rather than live — but it becomes real the moment a Gurmukhi title is catalogued.
+
+- source_spec: `/Users/davinderpalrehal/Projects/pothi-parivaar/_bmad-output/implementation-artifacts/spec-2-3-lcc-class-map.md`
+  summary: Nothing records which books hold a fallback class — a confirmed PN is indistinguishable from a genuine PN classification.
+  evidence: The warning is advisory only; confirm() happily PUTs an unedited PN, and class_source is deliberately not persisted. Since the table also assigns PN6790 to comics, there is no way to query the catalog for books that still need a human to set a real class.
+
+- source_spec: `/Users/davinderpalrehal/Projects/pothi-parivaar/_bmad-output/implementation-artifacts/spec-2-3-lcc-class-map.md`
+  summary: class_matched_keyword is returned by the API and asserted in tests but never surfaced in the UI.
+  evidence: ClassifySuggestDialog reads class_source only. Showing which keyword matched ("matched 'sikh' in the title") would let the librarian judge a suggestion instead of trusting it; otherwise the field is dead weight on the wire.
+
+- source_spec: `/Users/davinderpalrehal/Projects/pothi-parivaar/_bmad-output/implementation-artifacts/spec-2-3-lcc-class-map.md`
+  summary: No table-hygiene test guards DOMAIN_LCC_MAP against duplicate or subsumed keyword entries.
+  evidence: Under the original substring matching, "sikhism" was fully covered by the later "sikh", "coloring" by "color", and "maths" by "math" — entries that could never change an outcome. Word-boundary matching makes these meaningful again, but nothing prevents a future entry from being silently unreachable.

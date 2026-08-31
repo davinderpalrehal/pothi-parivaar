@@ -32,6 +32,15 @@
 
         <template v-else>
           <v-alert
+            v-if="hasNoClassSignal"
+            type="warning"
+            variant="tonal"
+            density="compact"
+            class="mb-3"
+            text="Nothing in this book's title or genres matched the classification table, so the LCC class below is only a fallback. Please set it yourself before confirming."
+          ></v-alert>
+          <v-alert
+            v-else
             type="info"
             variant="tonal"
             density="compact"
@@ -93,8 +102,9 @@
 </template>
 
 <script setup>
-import { ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import api from '../services/api'
+import { hasNoClassSignal as classSourceHasNoSignal } from '../utils/classification'
 
 const props = defineProps({
   modelValue: Boolean,
@@ -111,6 +121,11 @@ const selectedAuthorId = ref(null)
 const editableLcc = ref('')
 const editableCutter = ref('')
 const errorText = ref('')
+// Only ever set by a completed fetch, so a book opened with stored values
+// (watcher skips the fetch) never shows the "no signal" warning.
+const classSource = ref('')
+
+const hasNoClassSignal = computed(() => classSourceHasNoSignal(classSource.value))
 
 function authorDisplayName(author) {
   return [author.first_name, author.middle_name, author.last_name]
@@ -134,17 +149,22 @@ function resetState() {
   editableLcc.value = ''
   editableCutter.value = ''
   errorText.value = ''
+  classSource.value = ''
 }
 
 async function fetchSuggestion(primaryAuthorId = null) {
   if (!props.book) return
   isLoading.value = true
   errorText.value = ''
+  // Cleared up front: a re-fetch that fails (e.g. the 422 author re-pick)
+  // must not leave the previous fetch's warning standing next to the error.
+  classSource.value = ''
   try {
     const res = await api.suggestClassification(props.book.id, primaryAuthorId)
     needsAuthorChoice.value = false
     editableLcc.value = res.data.lcc_call_number
     editableCutter.value = res.data.cutter_number
+    classSource.value = res.data.class_source || ''
   } catch (err) {
     const detail = err?.response?.data?.detail
     if (err?.response?.status === 422 && detail?.authors) {
