@@ -2,9 +2,12 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import {
   LANGUAGE_OPTIONS,
+  MISSING_LANGUAGE_VALUE,
   additionalLanguageList,
   languageChipLabel,
   languageDetailLabel,
+  languageFilterOptions,
+  languageFilterParams,
   languageLabel,
   languageRule,
   normalizeLanguage,
@@ -158,4 +161,85 @@ test('mul is a real shortlist code, not a placeholder', () => {
   assert.equal(languageLabel('mul'), 'Multiple languages')
   assert.equal(normalizeLanguage('MUL'), 'mul')
   assert.equal(languageChipLabel('mul', null), 'Multiple languages')
+})
+
+// =============================================================================
+// Catalog filter helpers
+// =============================================================================
+
+test('filter options carry labels and counts, with the missing entry last', () => {
+  assert.deepEqual(
+    languageFilterOptions({
+      languages: [
+        { code: 'pan', book_count: 18 },
+        { code: 'eng', book_count: 4 },
+      ],
+      missing_count: 3,
+    }),
+    [
+      { title: 'Punjabi (18)', value: 'pan' },
+      { title: 'English (4)', value: 'eng' },
+      { title: 'No language set (3)', value: '__none__' },
+    ]
+  )
+})
+
+test('a code outside the entry shortlist still gets an option', () => {
+  assert.deepEqual(
+    languageFilterOptions({ languages: [{ code: 'tam', book_count: 1 }], missing_count: 0 }),
+    [{ title: 'TAM (1)', value: 'tam' }]
+  )
+})
+
+test('no missing entry when nothing is unset', () => {
+  const items = languageFilterOptions({
+    languages: [{ code: 'pan', book_count: 2 }],
+    missing_count: 0,
+  })
+  assert.equal(items.length, 1)
+  assert.ok(!items.some((item) => item.value === MISSING_LANGUAGE_VALUE))
+})
+
+test('an empty catalog yields no options at all', () => {
+  assert.deepEqual(languageFilterOptions({ languages: [], missing_count: 0 }), [])
+})
+
+test('a missing or malformed summary degrades to an empty list', () => {
+  assert.deepEqual(languageFilterOptions(undefined), [])
+  assert.deepEqual(languageFilterOptions({}), [])
+  assert.deepEqual(languageFilterOptions({ languages: null, missing_count: null }), [])
+})
+
+test('params map to exactly one query key, or none', () => {
+  assert.deepEqual(languageFilterParams('pan'), { language: 'pan' })
+  assert.deepEqual(languageFilterParams(MISSING_LANGUAGE_VALUE), { missing_language: true })
+  assert.deepEqual(languageFilterParams(null), {})
+  assert.deepEqual(languageFilterParams(''), {})
+})
+
+test('params never emit both keys at once', () => {
+  for (const value of ['pan', MISSING_LANGUAGE_VALUE, null, '', 'nonsense']) {
+    const params = languageFilterParams(value)
+    assert.ok(!('language' in params && 'missing_language' in params))
+  }
+})
+
+test('a server code outside the 3-letter shape still produces a filter', () => {
+  // The endpoint normalizes case but does not enforce the shape on read, so the
+  // control must not silently degrade to "no filter" and show everything.
+  assert.deepEqual(languageFilterParams('english'), { language: 'english' })
+  assert.deepEqual(languageFilterParams('  ENGLISH  '), { language: 'english' })
+})
+
+test('a selected option always maps back to a filter', () => {
+  const summary = {
+    languages: [
+      { code: 'pan', book_count: 2 },
+      { code: 'tam', book_count: 1 },
+    ],
+    missing_count: 4,
+  }
+  for (const item of languageFilterOptions(summary)) {
+    assert.notDeepEqual(languageFilterParams(item.value), {}, item.title)
+  }
 })

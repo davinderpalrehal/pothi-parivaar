@@ -252,6 +252,26 @@ class ClassificationSuggestion(SQLModel):
     class_matched_keyword: Optional[str] = None
 
 
+class LanguageSummaryRead(SQLModel):
+    """One primary language actually held in the catalog, with its book count."""
+
+    code: str
+    book_count: int
+
+
+class CatalogLanguagesRead(SQLModel):
+    """Languages present in the catalog plus how many books have none.
+
+    Drives the catalog filter control: `languages` is derived from the data, so
+    a free-entry code outside the entry-form shortlist is still filterable, and
+    no language is offered that would return zero results. `missing_count` backs
+    the "No language set" choice.
+    """
+
+    languages: list[LanguageSummaryRead]
+    missing_count: int
+
+
 class ReaderCreate(SQLModel):
     name: str
     avatar_icon: Optional[str] = "mdi-account"

@@ -7,6 +7,7 @@ from app.models import (
     BookCreate,
     BookRead,
     BookUpdate,
+    CatalogLanguagesRead,
     ClassificationSuggestRequest,
     ClassificationSuggestion,
     Reader,
@@ -28,6 +29,9 @@ def list_books(
     room: Optional[str] = Query(None, description="Filter by location room"),
     book_format: Optional[str] = Query(None, alias="format", description="Filter by format"),
     language: Optional[str] = Query(None, description="Filter by primary language (ISO 639-3 code)"),
+    missing_language: bool = Query(
+        False, description="Only books with no primary language set"
+    ),
     reading_status: Optional[CatalogStatus] = Query(
         None,
         alias="status",
@@ -45,6 +49,7 @@ def list_books(
         room=room,
         book_format=book_format,
         language=language,
+        missing_language=missing_language,
         status=reading_status,
         offset=offset,
         limit=limit,
@@ -60,6 +65,14 @@ def create_book(
     """Create a new book record in the catalog."""
     book = book_service.create_book(session, book_in)
     return book_service.to_book_read(session, book)
+
+
+@router.get("/languages", response_model=CatalogLanguagesRead)
+def get_catalog_languages(
+    session: Session = Depends(get_session),
+) -> CatalogLanguagesRead:
+    """Primary languages held in the catalog, with counts, plus the unset count."""
+    return book_service.catalog_languages(session)
 
 
 @router.get("/{book_id}", response_model=BookRead)
