@@ -100,6 +100,33 @@
                 density="comfortable"
               ></v-select>
             </v-col>
+            <v-col cols="12" sm="4">
+              <v-combobox
+                v-model="editForm.language"
+                label="Language"
+                :items="languageOptions"
+                :rules="[languageRule]"
+                item-title="label"
+                item-value="code"
+                placeholder="e.g. pan"
+                hint="ISO 639-3 code; pick one or type your own"
+                persistent-hint
+                variant="outlined"
+                density="comfortable"
+                clearable
+              ></v-combobox>
+            </v-col>
+            <v-col cols="12" sm="8">
+              <v-text-field
+                v-model="editForm.additional_languages"
+                label="Additional Languages (comma separated)"
+                placeholder="e.g. san, hin"
+                hint="ISO 639-3 codes, separated by commas"
+                persistent-hint
+                variant="outlined"
+                density="comfortable"
+              ></v-text-field>
+            </v-col>
             <v-col cols="12">
               <v-text-field
                 v-model="editForm.cover_url"
@@ -176,6 +203,9 @@
 
             <div v-if="book.genres_tags" class="text-caption text-grey-darken-1 mb-1">
               <strong>Genres:</strong> {{ book.genres_tags }}
+            </div>
+            <div v-if="languageDisplay" class="text-caption text-grey-darken-1 mb-1">
+              <strong>Language:</strong> {{ languageDisplay }}
             </div>
             <div v-if="book.isbn" class="text-caption text-grey-darken-1 mb-1">
               <strong>ISBN:</strong> {{ book.isbn }}
@@ -312,6 +342,7 @@ import api from '../services/api'
 import AuthorRows from './AuthorRows.vue'
 import ClassifySuggestDialog from './ClassifySuggestDialog.vue'
 import { authorsPayload, emptyAuthorRow, hasIncompleteAuthorRows, hydrateAuthorRows } from '../utils/authors'
+import { LANGUAGE_OPTIONS, languageDetailLabel, languageRule, normalizeLanguage } from '../utils/languages'
 
 const props = defineProps({
   modelValue: Boolean,
@@ -413,6 +444,12 @@ const selectedReaderAlreadyReading = computed(() => {
 
 const hasIncompleteAuthors = computed(() => hasIncompleteAuthorRows(editForm.authors))
 
+const languageOptions = LANGUAGE_OPTIONS
+
+const languageDisplay = computed(() =>
+  languageDetailLabel(props.book?.language, props.book?.additional_languages)
+)
+
 function emptyEditForm() {
   return {
     title: '',
@@ -425,6 +462,8 @@ function emptyEditForm() {
     location_shelf: '',
     genres_tags: '',
     formats: 'physical',
+    language: null,
+    additional_languages: '',
     cover_url: '',
     summary: '',
   }
@@ -452,6 +491,8 @@ function startEdit() {
     location_shelf: props.book.location_shelf || '',
     genres_tags: props.book.genres_tags || '',
     formats: props.book.formats || 'physical',
+    language: LANGUAGE_OPTIONS.find((item) => item.code === props.book.language) || props.book.language || null,
+    additional_languages: props.book.additional_languages || '',
     cover_url: props.book.cover_url || '',
     summary: props.book.summary || '',
   })
@@ -473,6 +514,8 @@ function updatePayload() {
     'cover_url',
     'summary',
     'genres_tags',
+    'language',
+    'additional_languages',
   ]
   for (const key of textFields) {
     if (payload[key] === '') payload[key] = null
@@ -481,6 +524,7 @@ function updatePayload() {
     const value = payload[key]
     if (value === '' || value === null || Number.isNaN(value)) payload[key] = null
   }
+  payload.language = normalizeLanguage(payload.language)
   return payload
 }
 

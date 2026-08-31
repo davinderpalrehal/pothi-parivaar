@@ -375,6 +375,8 @@ def test_migrate_schema_adds_publisher_id_to_legacy_book():
         assert "publisher_id" in column_names
         assert "lcc_call_number" in column_names
         assert "cutter_number" in column_names
+        assert "language" in column_names
+        assert "additional_languages" in column_names
 
         index_names = {
             row[0]
@@ -384,6 +386,7 @@ def test_migrate_schema_adds_publisher_id_to_legacy_book():
         }
         assert "ix_book_lcc_call_number" in index_names
         assert "ix_book_cutter_number" in index_names
+        assert "ix_book_language" in index_names
 
     with Session(legacy_engine) as session:
         def get_session_override():

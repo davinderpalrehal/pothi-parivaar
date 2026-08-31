@@ -40,6 +40,9 @@ class Book(SQLModel, table=True):
     # New fields for LCC call number and Cutter
     lcc_call_number: Optional[str] = Field(default=None, index=True)
     cutter_number: Optional[str] = Field(default=None, index=True)
+    # Human-entered language, never inferred
+    language: Optional[str] = Field(default=None, index=True)
+    additional_languages: Optional[str] = None
 
 
 
@@ -124,6 +127,32 @@ class PublisherRead(SQLModel):
     name: str
 
 
+LANGUAGE_CODE_LENGTH = 3
+
+
+def normalize_additional_languages(value: Optional[str]) -> Optional[str]:
+    """Trim the joined additional-language string; empty means unknown (NULL).
+
+    Individual codes are deliberately NOT validated -- this field is free text
+    so a multilingual book can be described however the cataloguer needs.
+    """
+    if value is None:
+        return None
+    return value.strip() or None
+
+
+def normalize_language_code(value: Optional[str]) -> Optional[str]:
+    """Normalize a human-entered ISO 639-3 code; empty means unknown (NULL)."""
+    if value is None:
+        return None
+    stripped = value.strip().lower()
+    if not stripped:
+        return None
+    if len(stripped) != LANGUAGE_CODE_LENGTH or not stripped.isascii() or not stripped.isalpha():
+        raise ValueError("language must be a 3-letter ISO 639-3 code")
+    return stripped
+
+
 class BookCreate(SQLModel):
     title: str
     author: Optional[str] = None
@@ -139,6 +168,18 @@ class BookCreate(SQLModel):
     location_room: Optional[str] = None
     location_unit: Optional[str] = None
     location_shelf: Optional[str] = None
+    language: Optional[str] = None
+    additional_languages: Optional[str] = None
+
+    @field_validator("language")
+    @classmethod
+    def validate_language(cls, value: Optional[str]) -> Optional[str]:
+        return normalize_language_code(value)
+
+    @field_validator("additional_languages")
+    @classmethod
+    def validate_additional_languages(cls, value: Optional[str]) -> Optional[str]:
+        return normalize_additional_languages(value)
 
 
 class BookUpdate(SQLModel):
@@ -159,6 +200,18 @@ class BookUpdate(SQLModel):
     read_count: Optional[int] = None
     lcc_call_number: Optional[str] = None
     cutter_number: Optional[str] = None
+    language: Optional[str] = None
+    additional_languages: Optional[str] = None
+
+    @field_validator("language")
+    @classmethod
+    def validate_language(cls, value: Optional[str]) -> Optional[str]:
+        return normalize_language_code(value)
+
+    @field_validator("additional_languages")
+    @classmethod
+    def validate_additional_languages(cls, value: Optional[str]) -> Optional[str]:
+        return normalize_additional_languages(value)
 
 
 class BookRead(SQLModel):
@@ -181,6 +234,8 @@ class BookRead(SQLModel):
     created_at: datetime
     lcc_call_number: Optional[str] = None
     cutter_number: Optional[str] = None
+    language: Optional[str] = None
+    additional_languages: Optional[str] = None
 
 
 class ClassificationSuggestRequest(SQLModel):

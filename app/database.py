@@ -113,11 +113,22 @@ def migrate_schema(db_engine: Engine) -> None:
                 connection.exec_driver_sql(
                     "ALTER TABLE book ADD COLUMN cutter_number VARCHAR"
                 )
+            if "language" not in book_columns:
+                connection.exec_driver_sql(
+                    "ALTER TABLE book ADD COLUMN language VARCHAR"
+                )
+            if "additional_languages" not in book_columns:
+                connection.exec_driver_sql(
+                    "ALTER TABLE book ADD COLUMN additional_languages VARCHAR"
+                )
             connection.exec_driver_sql(
                 "CREATE INDEX IF NOT EXISTS ix_book_lcc_call_number ON book (lcc_call_number)"
             )
             connection.exec_driver_sql(
                 "CREATE INDEX IF NOT EXISTS ix_book_cutter_number ON book (cutter_number)"
+            )
+            connection.exec_driver_sql(
+                "CREATE INDEX IF NOT EXISTS ix_book_language ON book (language)"
             )
         bookauthor_table = connection.exec_driver_sql(
             "SELECT name FROM sqlite_master WHERE type='table' AND name='bookauthor'"

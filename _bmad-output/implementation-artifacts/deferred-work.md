@@ -53,3 +53,39 @@
   evidence: Low likelihood in single-family/single-user usage; worth hardening if the app ever supports concurrent multi-user editing.
 
 - Frontend has no test runner or framework configured anywhere in the repo (only `frontend/src/utils/authors.test.js` exists, no `test` script in `frontend/package.json`), so the new `ClassifySuggestDialog.vue` and the call-number badges have no executable frontend verification. Pre-existing project-wide gap, not introduced by this story — surfaced incidentally while reviewing the new UI.
+
+## Deferred from: story 2.2 intent split (2026-08-31)
+
+- source_spec: none
+  summary: Domain-tuned LCC class map keyed off title keywords plus a second metadata source, replacing the DEFAULT_LCC_CLASS="PN" fallback.
+  evidence: Split from the 2.2 intent as an independently shippable goal; 43/46 books classify as PN because genres_tags is empty for 37 of them, but fixing subject coverage needs no schema change and ships without the language work.
+
+- source_spec: none
+  summary: Collision-proof Cutter — 3-digit positional Cutter with diacritics folded, title work mark plus publication year, and a shelflist uniqueness check at assign time (suggest_classification takes a session; work mark extends b -> b2).
+  evidence: Split from the 2.2 intent as an independently shippable goal; measured to take collisions from 50% to 9% on its own, independent of language capture. Rewrites the purity tests in tests/test_classification.py.
+
+- source_spec: none
+  summary: Language-first key ordering (LANG - CLASS - CUTTER) stored as components with a uniqueness constraint, badge display update, and a one-shot migration re-keying every existing book.
+  evidence: Split from the 2.2 intent; depends on language capture, the class map, and the new Cutter all landing first. Holding it until then avoids re-keying the collection twice.
+
+- source_spec: none
+  summary: Catalog data cleanup — 8 author records that are publishers/honorifics rather than people (ids 3, 17, 19, 24, 27, 31, 32, 33) and the duplicate book record for ISBN 9788122314755 (ids 9 and 35).
+  evidence: Split from the 2.2 intent; independent of the algorithm work but must land before any re-key migration, or it bakes confidently-wrong keys into the collection.
+
+- source_spec: `/Users/davinderpalrehal/Projects/pothi-parivaar/_bmad-output/implementation-artifacts/spec-2-2-book-language-capture.md`
+  summary: Fullscreen bulk language-assign dialog on the catalog, loading books with no language via a new missing_language filter and saving one PUT /books/{id} per changed row with per-row error reporting.
+  evidence: Split from the 2.2 spec over the token budget; independently shippable once the language field exists, since books can already be given a language one at a time through the edit dialog. Needs a missing_language query param added to GET /books alongside the language param this story ships.
+
+- source_spec: `/Users/davinderpalrehal/Projects/pothi-parivaar/_bmad-output/implementation-artifacts/spec-2-2-book-language-capture.md`
+  summary: Capture language from OpenLibrary via an additive best-effort jscmd=details fetch, expose it on IsbnLookupRead, and pre-fill it on the add-book form.
+  evidence: Split from the 2.2 spec over the token budget; measured to cover only ~26% of the collection so it is an accelerator over manual entry, not the main path. Must stay additive — the details view nests under ["details"] and returns subjects as bare strings, so repointing the existing jscmd=data mapping would silently null genres_tags. Requires reworking the URL-blind mock in tests/test_catalog_and_isbn.py:228-236 to a two-response side_effect.
+
+## Deferred from: code review of spec-2-2-book-language-capture.md (2026-08-31)
+
+- source_spec: `/Users/davinderpalrehal/Projects/pothi-parivaar/_bmad-output/implementation-artifacts/spec-2-2-book-language-capture.md`
+  summary: No catalog filter control for language — GET /books?language= ships with no frontend consumer, since App.vue's filter bar and param assembly were left untouched.
+  evidence: Deliberately scoped out of 2.2 (the story's task list omits App.vue), but grouping and filtering by language is the stated motivation for the epic, so the control is real outstanding work. Would also want an endpoint returning the catalog's distinct languages rather than hardcoding the shortlist a second time.
+
+- source_spec: `/Users/davinderpalrehal/Projects/pothi-parivaar/_bmad-output/implementation-artifacts/spec-2-2-book-language-capture.md`
+  summary: Language is invisible to the Hermes agent surfaces — app/api/hermes.py hand-builds its response dicts without it, and the free-text q search in list_books does not match on language.
+  evidence: Hermes cannot answer "find me a Punjabi book" even though the column now exists; get_library_status also has no per-language counts. Out of scope for 2.2, which never touched the Hermes layer, but the capability gap is real now that the data is being captured.
