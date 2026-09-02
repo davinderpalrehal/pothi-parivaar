@@ -1,13 +1,12 @@
 <template>
-  <v-dialog :model-value="modelValue" @update:model-value="$emit('update:modelValue', $event)" max-width="650" persistent>
-    <v-card>
+  <v-card elevation="1">
       <v-toolbar color="primary" density="compact">
         <v-toolbar-title class="text-subtitle-1 font-weight-bold">
           <v-icon icon="mdi-book-plus" class="mr-2"></v-icon>
           Add Book to Library
         </v-toolbar-title>
         <v-spacer></v-spacer>
-        <v-btn icon="mdi-close" variant="text" @click="close"></v-btn>
+        <v-btn icon="mdi-close" variant="text" aria-label="Back to catalog" @click="close"></v-btn>
       </v-toolbar>
 
       <v-tabs v-model="tab" color="primary" grow>
@@ -264,22 +263,17 @@
           Save to Library
         </v-btn>
       </v-card-actions>
-    </v-card>
-  </v-dialog>
+  </v-card>
 </template>
 
 <script setup>
-import { ref, reactive, computed, watch } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
 import api from '../services/api'
 import AuthorRows from './AuthorRows.vue'
 import { authorsPayload, emptyAuthorRow, hasIncompleteAuthorRows } from '../utils/authors'
 import { LANGUAGE_OPTIONS, languageRule, normalizeLanguage } from '../utils/languages'
 
-const props = defineProps({
-  modelValue: Boolean,
-})
-
-const emit = defineEmits(['update:modelValue', 'saved'])
+const emit = defineEmits(['saved', 'done', 'cancel'])
 const locations = ref([])
 
 const tab = ref('manual')
@@ -372,13 +366,9 @@ async function loadLocationOptions() {
   }
 }
 
-watch(
-  () => props.modelValue,
-  (open) => {
-    if (open) loadLocationOptions()
-  },
-  { immediate: true }
-)
+onMounted(() => {
+  loadLocationOptions()
+})
 
 async function handleLookupISBN() {
   if (!isbnInput.value) return
@@ -480,7 +470,10 @@ async function persistBook() {
 
 async function submit() {
   const ok = await persistBook()
-  if (ok) close()
+  if (ok) {
+    resetForm()
+    emit('done')
+  }
 }
 
 async function submitAndAddNext() {
@@ -498,7 +491,8 @@ function resetForm() {
 }
 
 function close() {
-  emit('update:modelValue', false)
+  if (isSaving.value) return
+  emit('cancel')
   resetForm()
 }
 </script>

@@ -149,3 +149,17 @@
 - source_spec: `/Users/davinderpalrehal/Projects/pothi-parivaar/_bmad-output/implementation-artifacts/spec-catalog-language-filter.md`
   summary: No executable verification for any App.vue filter behavior — the language param assembly, the two loadLanguageOptions refresh hooks, and the new stale-selection clear are all verified only by reading the code and by hand.
   evidence: Pure helpers in languages.js are covered by node:test (48 tests), but nothing mounts App.vue, so `Object.assign(params, languageFilterParams(...))` could be replaced with `params.language = languageFilter.value` and the whole suite would stay green. Acceptance criterion "counts reflect the change without a page reload" has no automated check at all. This is a third instance of the repo-wide missing-component-runner gap already recorded from the 2.1 and 1.2 reviews, not a new root cause.
+
+## Deferred from: code review of spec-add-book-page.md (2026-09-02)
+
+- source_spec: `/Users/davinderpalrehal/Projects/pothi-parivaar/_bmad-output/implementation-artifacts/spec-add-book-page.md`
+  summary: Add Book page still lives in AddBookDialog.vue with a nested primary toolbar.
+  evidence: Conversion was scoped to drop v-dialog, not rename the SFC or restyle chrome; dual primary bars are leftover from the modal header.
+
+- source_spec: `/Users/davinderpalrehal/Projects/pothi-parivaar/_bmad-output/implementation-artifacts/spec-add-book-page.md`
+  summary: No Vue mount/E2E tests for save, ISBN lookup, discard-on-leave, or live scroll above the bottom nav.
+  evidence: Repo has only node:test source contracts in addBookView.test.js; adding a component runner is Ask First (new npm deps). Browser MCP was unavailable this session.
+
+- source_spec: `/Users/davinderpalrehal/Projects/pothi-parivaar/_bmad-output/implementation-artifacts/spec-add-book-page.md`
+  summary: handleBookSaved still merges into selectedBook on every add-book saved emit, including Save & Add Next.
+  evidence: Pre-existing refresh helper shared with Book Detail; persist still emits saved with no created-book payload.

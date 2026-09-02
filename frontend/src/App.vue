@@ -53,7 +53,7 @@
       </v-toolbar-title>
 
       <!-- Desktop View Switcher Tabs -->
-      <v-tabs v-model="currentView" color="white" class="d-none d-md-flex">
+      <v-tabs v-model="shellView" color="white" class="d-none d-md-flex">
         <v-tab value="catalog" prepend-icon="mdi-bookshelf">Catalog</v-tab>
         <v-tab value="tracker" prepend-icon="mdi-account-group">Reading Tracker</v-tab>
         <v-tab value="shelves" prepend-icon="mdi-map-marker-path">Shelves</v-tab>
@@ -68,7 +68,7 @@
         variant="flat"
         color="white"
         class="text-primary font-weight-bold mr-2"
-        @click="showAddBook = true"
+        @click="goToAddBook"
       >
         Add Book
       </v-btn>
@@ -181,7 +181,7 @@
             <v-icon icon="mdi-book-open-page-variant-outline" size="64" color="grey-lighten-1"></v-icon>
             <div class="text-h6 text-grey-darken-2 mt-2">No books found</div>
             <div class="text-body-2 text-grey mb-4">Add your first book manually or lookup via ISBN barcode!</div>
-            <v-btn color="primary" prepend-icon="mdi-plus" @click="showAddBook = true">
+            <v-btn color="primary" prepend-icon="mdi-plus" @click="goToAddBook">
               Add a Book
             </v-btn>
           </div>
@@ -221,6 +221,14 @@
           <HonorificManager
             ref="honorificsRef"
             @changed="handleHonorificsChanged"
+          />
+        </div>
+
+        <div v-else-if="currentView === ADD_BOOK_VIEW" class="pb-16 pb-md-4">
+          <AddBookDialog
+            @saved="handleBookSaved"
+            @done="currentView = viewAfterAddBookPersist({ addNext: false })"
+            @cancel="currentView = viewAfterAddBookCancel()"
           />
         </div>
 
@@ -298,7 +306,7 @@
     </v-main>
 
     <!-- Bottom Navigation on Mobile -->
-    <v-bottom-navigation v-model="currentView" grow color="primary" class="d-flex d-md-none">
+    <v-bottom-navigation v-model="shellView" grow color="primary" class="d-flex d-md-none">
       <v-btn value="catalog">
         <v-icon>mdi-bookshelf</v-icon>
         <span>Catalog</span>
@@ -322,11 +330,6 @@
     </v-bottom-navigation>
 
     <!-- Dialogs -->
-    <AddBookDialog
-      v-model="showAddBook"
-      @saved="handleBookSaved"
-    />
-
     <BookDetailDialog
       v-model="showBookDetail"
       :book="selectedBook"
@@ -336,7 +339,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, watch, nextTick } from 'vue'
 import api from './services/api'
 import { languageFilterOptions, languageFilterParams } from './utils/languages.js'
 import BookCard from './components/BookCard.vue'
@@ -345,9 +348,38 @@ import BookDetailDialog from './components/BookDetailDialog.vue'
 import ReaderTracker from './components/ReaderTracker.vue'
 import ShelfManager from './components/ShelfManager.vue'
 import HonorificManager from './components/HonorificManager.vue'
+import {
+  ADD_BOOK_VIEW,
+  SHELL_VIEWS,
+  shellNavValue,
+  viewAfterAddBookCancel,
+  viewAfterAddBookPersist,
+} from './utils/addBookView.js'
 
 const drawer = ref(false)
 const currentView = ref('catalog')
+const suppressShellNullSync = ref(false)
+
+function goToAddBook() {
+  currentView.value = ADD_BOOK_VIEW
+  suppressShellNullSync.value = true
+  nextTick(() => {
+    setTimeout(() => {
+      suppressShellNullSync.value = false
+    }, 50)
+  })
+}
+
+const shellView = computed({
+  get: () => shellNavValue(currentView.value),
+  set: (value) => {
+    if (!value || !SHELL_VIEWS.includes(value)) return
+    // Vuetify writes the first tab/nav item when the bound model is null.
+    // Ignore that sync so opening Add Book does not bounce to catalog.
+    if (currentView.value === ADD_BOOK_VIEW && suppressShellNullSync.value) return
+    currentView.value = value
+  },
+})
 
 const books = ref([])
 const activeReadersByBook = ref({})
@@ -373,7 +405,6 @@ const statusOptions = [
   { title: 'Finished', value: 'finished' },
 ]
 
-const showAddBook = ref(false)
 const showBookDetail = ref(false)
 const selectedBook = ref(null)
 
