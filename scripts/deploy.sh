@@ -41,6 +41,7 @@ rsync -az \
   --exclude '__pycache__/' \
   --exclude '.pytest_cache/' \
   --exclude 'node_modules/' \
+  --exclude '.pnpm-store/' \
   --exclude '.vite/' \
   --exclude '_bmad/' \
   --exclude '_bmad-output/' \

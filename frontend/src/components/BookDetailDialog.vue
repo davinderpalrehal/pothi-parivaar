@@ -197,7 +197,7 @@
                 prepend-icon="mdi-bookshelf"
                 @click="showClassifyDialog = true"
               >
-                Classify
+                {{ alreadyClassified ? 'Reclassify' : 'Classify' }}
               </v-btn>
             </div>
 
@@ -448,6 +448,10 @@ const languageOptions = LANGUAGE_OPTIONS
 
 const languageDisplay = computed(() =>
   languageDetailLabel(props.book?.language, props.book?.additional_languages)
+)
+
+const alreadyClassified = computed(
+  () => !!(props.book?.lcc_call_number && props.book?.cutter_number)
 )
 
 function emptyEditForm() {

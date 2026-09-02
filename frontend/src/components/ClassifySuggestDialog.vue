@@ -40,6 +40,14 @@
             text="Nothing in this book's title or genres matched the classification table, so the LCC class below is only a fallback. Please set it yourself before confirming."
           ></v-alert>
           <v-alert
+            v-else-if="alreadyClassified"
+            type="info"
+            variant="tonal"
+            density="compact"
+            class="mb-3"
+            text="Suggested from the book's current title, genres, and authors. Confirm to replace the saved shelf key."
+          ></v-alert>
+          <v-alert
             v-else
             type="info"
             variant="tonal"
@@ -94,7 +102,7 @@
           :loading="isSaving"
           @click="confirm"
         >
-          Confirm
+          {{ alreadyClassified ? 'Replace shelf key' : 'Confirm' }}
         </v-btn>
       </v-card-actions>
     </v-card>
@@ -121,11 +129,13 @@ const selectedAuthorId = ref(null)
 const editableLcc = ref('')
 const editableCutter = ref('')
 const errorText = ref('')
-// Only ever set by a completed fetch, so a book opened with stored values
-// (watcher skips the fetch) never shows the "no signal" warning.
+// Set by a completed suggest fetch (never copied from stored LCC/Cutter).
 const classSource = ref('')
 
 const hasNoClassSignal = computed(() => classSourceHasNoSignal(classSource.value))
+const alreadyClassified = computed(
+  () => !!(props.book?.lcc_call_number && props.book?.cutter_number)
+)
 
 function authorDisplayName(author) {
   return [author.first_name, author.middle_name, author.last_name]
@@ -210,12 +220,7 @@ watch(
   ([open]) => {
     if (!open) return
     resetState()
-    if (props.book?.lcc_call_number && props.book?.cutter_number) {
-      editableLcc.value = props.book.lcc_call_number
-      editableCutter.value = props.book.cutter_number
-    } else {
-      fetchSuggestion()
-    }
+    fetchSuggestion()
   }
 )
 </script>
