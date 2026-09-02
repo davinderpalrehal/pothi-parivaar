@@ -5,8 +5,9 @@ from sqlmodel import SQLModel, Session, create_engine, select
 
 from app.main import app
 from app.database import get_session, migrate_schema
-from app.models import Author, Book, BookAuthor, Publisher
+from app.models import Author, Book, BookAuthor, Honorific, Publisher
 from app.services.author_migration import migrate_book_author_strings
+from app.services.honorific_service import seed_honorifics_if_empty
 
 test_engine = create_engine(
     "sqlite:///:memory:",
@@ -19,6 +20,8 @@ test_engine = create_engine(
 def session_fixture():
     SQLModel.metadata.create_all(test_engine)
     with Session(test_engine) as session:
+        seed_honorifics_if_empty(session)
+        session.commit()
         yield session
     SQLModel.metadata.drop_all(test_engine)
 
@@ -314,6 +317,37 @@ def test_migrate_schema_converts_legacy_author_strings():
     SQLModel.metadata.drop_all(engine)
 
 
+def test_migrate_schema_refreshes_stale_honorific_short_form():
+    engine = create_engine(
+        "sqlite:///:memory:",
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
+    SQLModel.metadata.create_all(engine)
+    with Session(engine) as session:
+        author = Author(first_name="Dr.", middle_name="Davinder", last_name="Singh")
+        session.add(author)
+        session.flush()
+        book = Book(title="A Medical Life", author="D. Singh")
+        session.add(book)
+        session.flush()
+        session.add(
+            BookAuthor(book_id=book.id, author_id=author.id, display_order=0)
+        )
+        session.commit()
+
+    migrate_schema(engine)
+
+    with Session(engine) as session:
+        book = session.exec(select(Book)).first()
+        author = session.exec(select(Author)).first()
+        assert author.first_name == "Dr."
+        assert author.middle_name == "Davinder"
+        assert author.last_name == "Singh"
+        assert book.author == "Dr. D. Singh"
+    SQLModel.metadata.drop_all(engine)
+
+
 def test_update_echoing_derived_author_keeps_stored_name_parts(client: TestClient):
     created = client.post(
         "/api/v1/books",
@@ -331,6 +365,27 @@ def test_update_echoing_derived_author_keeps_stored_name_parts(client: TestClien
     assert updated.json()["title"] == "How to Win Friends"
     assert updated.json()["authors"][0]["first_name"] == "Dale"
     assert updated.json()["authors"][0]["last_name"] == "Carnegie"
+
+
+def test_update_echoing_honorific_short_form_keeps_name_parts(client: TestClient):
+    created = client.post(
+        "/api/v1/books",
+        json={
+            "title": "A Medical Life",
+            "authors": [
+                {"first_name": "Dr.", "middle_name": "Davinder", "last_name": "Singh"}
+            ],
+        },
+    )
+    book_id = created.json()["id"]
+    updated = client.put(
+        f"/api/v1/books/{book_id}",
+        json={"title": "A Medical Life", "author": "Dr. D. Singh"},
+    )
+    assert updated.status_code == 200
+    assert updated.json()["authors"][0]["first_name"] == "Dr."
+    assert updated.json()["authors"][0]["middle_name"] == "Davinder"
+    assert updated.json()["authors"][0]["last_name"] == "Singh"
 
 
 def test_migrate_schema_adds_publisher_id_to_legacy_book():
@@ -404,3 +459,145 @@ def test_migrate_schema_adds_publisher_id_to_legacy_book():
         finally:
             app.dependency_overrides.clear()
     SQLModel.metadata.drop_all(legacy_engine)
+
+
+def test_doctor_and_bhb_short_form_and_search(client: TestClient, session: Session):
+    doctor = client.post(
+        "/api/v1/books",
+        json={
+            "title": "A Medical Life",
+            "authors": [
+                {"first_name": "Dr.", "middle_name": "Davinder", "last_name": "Singh"}
+            ],
+        },
+    )
+    assert doctor.status_code == 201, doctor.text
+    assert doctor.json()["author"] == "Dr. D. Singh"
+    assert doctor.json()["authors"][0]["first_name"] == "Dr."
+    assert doctor.json()["authors"][0]["middle_name"] == "Davinder"
+    assert doctor.json()["authors"][0]["last_name"] == "Singh"
+
+    bhb = client.post(
+        "/api/v1/books",
+        json={
+            "title": "Sundari",
+            "authors": [
+                {
+                    "first_name": "Bhai",
+                    "middle_name": "Sahib Bhai Vir Singh",
+                    "last_name": "ji",
+                }
+            ],
+        },
+    )
+    assert bhb.status_code == 201, bhb.text
+    assert bhb.json()["author"] == "BHB V. Singh"
+    assert bhb.json()["authors"][0]["first_name"] == "Bhai"
+    assert bhb.json()["authors"][0]["last_name"] == "ji"
+
+    found = client.get("/api/v1/books", params={"q": "BHB"})
+    assert found.status_code == 200
+    assert bhb.json()["id"] in [book["id"] for book in found.json()]
+
+    dale = client.post(
+        "/api/v1/books",
+        json={
+            "title": "How to Win",
+            "authors": [{"first_name": "Dale", "last_name": "Carnegie"}],
+        },
+    )
+    assert dale.json()["author"] == "D. Carnegie"
+
+    plato = client.post(
+        "/api/v1/books",
+        json={"title": "Republic", "authors": [{"first_name": "Plato", "last_name": " "}]},
+    )
+    assert plato.json()["author"] == "Plato"
+
+
+def test_honorific_crud_refreshes_projection_without_rewriting_names(
+    client: TestClient, session: Session
+):
+    created = client.post(
+        "/api/v1/books",
+        json={
+            "title": "Custom Title Book",
+            "authors": [
+                {"first_name": "Kavi", "middle_name": "Davinder", "last_name": "Singh"}
+            ],
+        },
+    )
+    assert created.status_code == 201
+    book_id = created.json()["id"]
+    assert created.json()["author"] == "K. Singh"
+
+    listed = client.get("/api/v1/honorifics")
+    assert listed.status_code == 200
+    assert any(row["tokens"] == "Bhai Sahib Bhai" for row in listed.json())
+
+    added = client.post(
+        "/api/v1/honorifics",
+        json={"tokens": "Kavi", "role": "prefix", "abbreviation": "Kv."},
+    )
+    assert added.status_code == 201, added.text
+    assert added.json()["tokens"] == "Kavi"
+
+    refreshed = client.get(f"/api/v1/books/{book_id}")
+    assert refreshed.json()["author"] == "Kv. D. Singh"
+    assert refreshed.json()["authors"][0]["first_name"] == "Kavi"
+    assert refreshed.json()["authors"][0]["middle_name"] == "Davinder"
+
+    duplicate = client.post(
+        "/api/v1/honorifics",
+        json={"tokens": "Kavi", "role": "prefix", "abbreviation": "K."},
+    )
+    assert duplicate.status_code == 409
+
+    empty = client.post(
+        "/api/v1/honorifics",
+        json={"tokens": "  ", "role": "prefix", "abbreviation": "X"},
+    )
+    assert empty.status_code == 422
+
+    disabled = client.put(
+        f"/api/v1/honorifics/{added.json()['id']}",
+        json={"enabled": False},
+    )
+    assert disabled.status_code == 200
+    assert disabled.json()["enabled"] is False
+    after_disable = client.get(f"/api/v1/books/{book_id}")
+    assert after_disable.json()["author"] == "K. Singh"
+    assert after_disable.json()["authors"][0]["first_name"] == "Kavi"
+
+    removed = client.delete(f"/api/v1/honorifics/{added.json()['id']}")
+    assert removed.status_code == 204
+    after_delete = client.get(f"/api/v1/books/{book_id}")
+    assert after_delete.json()["author"] == "K. Singh"
+    assert after_delete.json()["authors"][0]["first_name"] == "Kavi"
+
+    period_dup = client.post(
+        "/api/v1/honorifics",
+        json={"tokens": "Dr.", "role": "prefix", "abbreviation": "Dr."},
+    )
+    assert period_dup.status_code == 409
+
+    bhb_row = session.exec(
+        select(Honorific).where(Honorific.tokens == "Bhai Sahib Bhai")
+    ).first()
+    assert bhb_row is not None
+    client.put(f"/api/v1/honorifics/{bhb_row.id}", json={"enabled": False})
+
+    bhb_book = client.post(
+        "/api/v1/books",
+        json={
+            "title": "After Disable BHB",
+            "authors": [
+                {
+                    "first_name": "Bhai",
+                    "middle_name": "Sahib Bhai Vir Singh",
+                    "last_name": "ji",
+                }
+            ],
+        },
+    )
+    assert bhb_book.json()["author"] != "BHB V. Singh"

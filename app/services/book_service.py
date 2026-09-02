@@ -17,6 +17,7 @@ from app.models import (
     ReadingSession,
 )
 from app.services.location_service import upsert_location
+from app.services.honorific_service import load_enabled_honorifics
 from app.services.name_rules import (
     AuthorName,
     joined_short_forms,
@@ -122,7 +123,7 @@ def _replace_book_authors(session: Session, book: Book, names: list[AuthorName])
         session.add(
             BookAuthor(book_id=book.id, author_id=author.id, display_order=order)
         )
-    book.author = joined_short_forms(unique_names)
+    book.author = joined_short_forms(unique_names, load_enabled_honorifics(session))
 
 
 def _set_publisher(session: Session, book: Book, publisher_name: Optional[str]) -> None:
@@ -180,7 +181,8 @@ def to_book_read(session: Session, book: Book) -> BookRead:
                 middle_name=author.middle_name,
             )
             for author in authors
-        ]
+        ],
+        load_enabled_honorifics(session),
     )
     return BookRead(
         id=book.id,
@@ -349,7 +351,10 @@ def update_book(session: Session, book: Book, book_update: BookUpdate) -> Book:
         names = [_author_name_from_input(item) for item in (book_update.authors or [])]
         _replace_book_authors(session, book, names)
     elif author_string is not None:
-        current_derived = joined_short_forms(_current_author_names(session, book))
+        current_derived = joined_short_forms(
+            _current_author_names(session, book),
+            load_enabled_honorifics(session),
+        )
         if (author_string or "").strip() != current_derived:
             _replace_book_authors(session, book, split_author_string(author_string))
 

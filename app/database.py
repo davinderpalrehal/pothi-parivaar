@@ -3,6 +3,11 @@ from sqlalchemy import event, Engine
 from sqlmodel import SQLModel, create_engine, Session
 from app.config import settings
 from app.services.author_migration import migrate_book_author_strings
+from app.services.honorific_service import (
+    HONORIFIC_TOKEN_ROLE_INDEX_SQL,
+    refresh_book_author_projections,
+    seed_honorifics_if_empty,
+)
 from app.services.location_service import LOCATION_TRIPLE_INDEX_SQL
 
 # Create SQLite engine
@@ -133,10 +138,20 @@ def migrate_schema(db_engine: Engine) -> None:
         bookauthor_table = connection.exec_driver_sql(
             "SELECT name FROM sqlite_master WHERE type='table' AND name='bookauthor'"
         ).first()
+        honorific_table = connection.exec_driver_sql(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name='honorific'"
+        ).first()
+        if honorific_table:
+            connection.exec_driver_sql(HONORIFIC_TOKEN_ROLE_INDEX_SQL)
 
     if book_table and bookauthor_table:
         with Session(db_engine) as session:
             migrate_book_author_strings(session)
+
+    with Session(db_engine) as session:
+        seed_honorifics_if_empty(session)
+        refresh_book_author_projections(session)
+        session.commit()
 
 
 def init_db() -> None:

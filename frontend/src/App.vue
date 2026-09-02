@@ -30,6 +30,12 @@
           @click="currentView = 'shelves'; drawer = false"
         ></v-list-item>
         <v-list-item
+          prepend-icon="mdi-account-tie"
+          title="Honorifics"
+          :active="currentView === 'honorifics'"
+          @click="currentView = 'honorifics'; drawer = false"
+        ></v-list-item>
+        <v-list-item
           prepend-icon="mdi-robot"
           title="Hermes AI Assistant"
           :active="currentView === 'hermes'"
@@ -51,6 +57,7 @@
         <v-tab value="catalog" prepend-icon="mdi-bookshelf">Catalog</v-tab>
         <v-tab value="tracker" prepend-icon="mdi-account-group">Reading Tracker</v-tab>
         <v-tab value="shelves" prepend-icon="mdi-map-marker-path">Shelves</v-tab>
+        <v-tab value="honorifics" prepend-icon="mdi-account-tie">Honorifics</v-tab>
         <v-tab value="hermes" prepend-icon="mdi-robot">Hermes AI</v-tab>
       </v-tabs>
 
@@ -210,6 +217,13 @@
           />
         </div>
 
+        <div v-else-if="currentView === 'honorifics'">
+          <HonorificManager
+            ref="honorificsRef"
+            @changed="handleHonorificsChanged"
+          />
+        </div>
+
         <!-- View: Hermes AI Assistant Overview -->
         <div v-else-if="currentView === 'hermes'">
           <v-card class="pa-4" elevation="1">
@@ -297,6 +311,10 @@
         <v-icon>mdi-map-marker-path</v-icon>
         <span>Shelves</span>
       </v-btn>
+      <v-btn value="honorifics">
+        <v-icon>mdi-account-tie</v-icon>
+        <span>Honorifics</span>
+      </v-btn>
       <v-btn value="hermes">
         <v-icon>mdi-robot</v-icon>
         <span>Hermes</span>
@@ -326,6 +344,7 @@ import AddBookDialog from './components/AddBookDialog.vue'
 import BookDetailDialog from './components/BookDetailDialog.vue'
 import ReaderTracker from './components/ReaderTracker.vue'
 import ShelfManager from './components/ShelfManager.vue'
+import HonorificManager from './components/HonorificManager.vue'
 
 const drawer = ref(false)
 const currentView = ref('catalog')
@@ -360,6 +379,7 @@ const selectedBook = ref(null)
 
 const trackerRef = ref(null)
 const shelvesRef = ref(null)
+const honorificsRef = ref(null)
 
 const hermesLoading = ref(false)
 const hermesStatus = ref(null)
@@ -417,6 +437,7 @@ watch(currentView, (newVal) => {
   if (newVal === 'catalog') fetchBooks()
   else if (newVal === 'tracker' && trackerRef.value) trackerRef.value.loadData()
   else if (newVal === 'shelves' && shelvesRef.value) shelvesRef.value.loadLocations()
+  else if (newVal === 'honorifics' && honorificsRef.value) honorificsRef.value.loadHonorifics()
   else if (newVal === 'hermes') fetchHermesStatus()
 })
 
@@ -465,6 +486,10 @@ function handleReadingUpdated() {
 function handleFilterRoom(room) {
   currentView.value = 'catalog'
   roomFilter.value = room
+  fetchBooks()
+}
+
+function handleHonorificsChanged() {
   fetchBooks()
 }
 
