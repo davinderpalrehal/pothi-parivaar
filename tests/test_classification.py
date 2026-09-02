@@ -481,6 +481,33 @@ def test_confirm_flow_persists_via_put_and_shows_on_get(client: TestClient):
     assert fetched.json()["cutter_number"] == suggestion["cutter_number"]
 
 
+def test_suggest_after_saved_class_uses_updated_genres(client: TestClient):
+    book = _create_book(client, title="A Quiet Evening", genres_tags="History")
+    first = _suggest(client, book["id"]).json()
+    put_res = client.put(
+        f"/api/v1/books/{book['id']}",
+        json={
+            "lcc_call_number": first["lcc_call_number"],
+            "cutter_number": first["cutter_number"],
+        },
+    )
+    assert put_res.status_code == 200, put_res.text
+    assert put_res.json()["lcc_call_number"] == "D"
+
+    tagged = client.put(
+        f"/api/v1/books/{book['id']}",
+        json={"genres_tags": "Science Fiction"},
+    )
+    assert tagged.status_code == 200, tagged.text
+    assert tagged.json()["lcc_call_number"] == "D"
+
+    second = _suggest(client, book["id"])
+    assert second.status_code == 200, second.text
+    body = second.json()
+    assert body["lcc_call_number"] == "PZ"
+    assert body["lcc_call_number"] != tagged.json()["lcc_call_number"]
+
+
 def test_book_with_neither_field_set_reads_as_null(client: TestClient):
     book = _create_book(client, title="Plain Book")
     assert book["lcc_call_number"] is None
