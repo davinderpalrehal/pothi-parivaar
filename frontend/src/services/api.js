@@ -87,6 +87,20 @@ export default {
     return apiClient.get('/locations/summary')
   },
 
+  // Honorifics
+  getHonorifics() {
+    return apiClient.get('/honorifics')
+  },
+  createHonorific(honorificData) {
+    return apiClient.post('/honorifics', honorificData)
+  },
+  updateHonorific(id, honorificData) {
+    return apiClient.put(`/honorifics/${id}`, honorificData)
+  },
+  deleteHonorific(id) {
+    return apiClient.delete(`/honorifics/${id}`)
+  },
+
   // ISBN Lookup
   lookupISBN(isbn) {
     return apiClient.get(`/isbn/${isbn}`)

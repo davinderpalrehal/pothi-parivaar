@@ -31,3 +31,5 @@ Live catalog (2026-08-23) stores and shows a single `Book.author` string. This s
 ## One-time conversion (CAP-7)
 
 Run once against existing `Book.author` values using `name-rules.md`. Afterward, `Book.author` is not the source of truth. `D. Carnegie` becomes first=`D.`, last=`Carnegie` — `Dale` is not recovered.
+
+Honorific display (CAP-3 update, CAP-9) does **not** run a second conversion. Rows already split keep their first/middle/last; only the derived short form changes. There is no Settings screen today — CAP-9 adds the honorific list editor.

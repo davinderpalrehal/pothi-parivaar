@@ -1,9 +1,16 @@
 from app.services.name_rules import (
     AuthorName,
+    HonorificRule,
     author_short_form,
     joined_short_forms,
     split_author_string,
 )
+
+SEEDISH = [
+    HonorificRule(tokens=("Dr",), role="prefix", abbreviation="Dr."),
+    HonorificRule(tokens=("Bhai", "Sahib", "Bhai"), role="prefix", abbreviation="BHB"),
+    HonorificRule(tokens=("ji",), role="suffix", abbreviation=""),
+]
 
 
 def test_split_examples_from_name_rules():
@@ -50,3 +57,35 @@ def test_short_form_and_joined_display():
             AuthorName(first_name="Jane", last_name="Doe"),
         ]
     ) == "Plato, J. Doe"
+
+
+def test_split_keeps_titles_in_name_parts():
+    assert split_author_string("Dr. Davinder Singh") == [
+        AuthorName(first_name="Dr.", last_name="Singh", middle_name="Davinder")
+    ]
+    assert split_author_string("Bhai Sahib Bhai Vir Singh ji") == [
+        AuthorName(
+            first_name="Bhai",
+            last_name="ji",
+            middle_name="Sahib Bhai Vir Singh",
+        )
+    ]
+
+
+def test_short_form_peels_honorifics_including_middle():
+    assert (
+        author_short_form("Dr.", "Singh", "Davinder", SEEDISH) == "Dr. D. Singh"
+    )
+    assert (
+        author_short_form("Bhai", "ji", "Sahib Bhai Vir Singh", SEEDISH)
+        == "BHB V. Singh"
+    )
+    assert author_short_form("Dale", "Carnegie", None, SEEDISH) == "D. Carnegie"
+    assert author_short_form("Plato", " ", None, SEEDISH) == "Plato"
+    assert joined_short_forms(
+        [
+            AuthorName(first_name="Dr.", last_name="Singh", middle_name="Davinder"),
+            AuthorName(first_name="Jane", last_name="Doe"),
+        ],
+        SEEDISH,
+    ) == "Dr. D. Singh, J. Doe"

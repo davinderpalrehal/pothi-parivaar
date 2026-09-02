@@ -79,6 +79,14 @@ class Location(SQLModel, table=True):
     shelf: str = ""
 
 
+class Honorific(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    tokens: str = Field(index=True)
+    role: str = Field(index=True)  # prefix | suffix
+    abbreviation: str = ""
+    enabled: bool = True
+
+
 # ==============================================================================
 # Request / Response Schemas
 # ==============================================================================
@@ -372,6 +380,60 @@ class LocationRead(SQLModel):
     room: str
     unit: str
     shelf: str
+
+
+class HonorificCreate(SQLModel):
+    tokens: str
+    role: Literal["prefix", "suffix"]
+    abbreviation: str = ""
+    enabled: bool = True
+
+    @field_validator("tokens")
+    @classmethod
+    def tokens_must_not_be_blank(cls, value: str) -> str:
+        stripped = " ".join((value or "").split())
+        if not stripped:
+            raise ValueError("tokens must not be empty")
+        return stripped
+
+    @field_validator("abbreviation", mode="before")
+    @classmethod
+    def abbreviation_may_be_empty(cls, value: object) -> str:
+        if value is None:
+            return ""
+        return str(value).strip()
+
+
+class HonorificUpdate(SQLModel):
+    tokens: Optional[str] = None
+    role: Optional[Literal["prefix", "suffix"]] = None
+    abbreviation: Optional[str] = None
+    enabled: Optional[bool] = None
+
+    @field_validator("tokens")
+    @classmethod
+    def tokens_must_not_be_blank(cls, value: Optional[str]) -> Optional[str]:
+        if value is None:
+            return None
+        stripped = " ".join(value.split())
+        if not stripped:
+            raise ValueError("tokens must not be empty")
+        return stripped
+
+    @field_validator("abbreviation", mode="before")
+    @classmethod
+    def abbreviation_may_be_empty(cls, value: object) -> Optional[str]:
+        if value is None:
+            return None
+        return str(value).strip()
+
+
+class HonorificRead(SQLModel):
+    id: int
+    tokens: str
+    role: str
+    abbreviation: str
+    enabled: bool
 
 
 class HealthResponse(SQLModel):

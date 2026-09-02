@@ -122,6 +122,28 @@
   summary: No table-hygiene test guards DOMAIN_LCC_MAP against duplicate or subsumed keyword entries.
   evidence: Under the original substring matching, "sikhism" was fully covered by the later "sikh", "coloring" by "color", and "maths" by "math" — entries that could never change an outcome. Word-boundary matching makes these meaningful again, but nothing prevents a future entry from being silently unreachable.
 
+## Deferred from: code review of spec-1-4-author-honorifics.md (2026-09-02)
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-1-4-author-honorifics.md`
+  summary: Epic 1 compiled context still documents the old first-initial short form and lists “new short-form style” as out of this epic.
+  evidence: Honorific peeling shipped in 1.4; `epic-1-context.md` was regenerated from planning docs that predate CAP-3/CAP-9.
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-1-4-author-honorifics.md`
+  summary: No restore-defaults path after the household deletes or disables seeded honorifics.
+  evidence: `honorifics.md` calls the seed a recovery baseline, but `seed_honorifics_if_empty` only runs when the table has zero rows.
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-1-4-author-honorifics.md`
+  summary: ISBN prefill and Add Book UI do not hint that titles belong in first/middle/last.
+  evidence: Story 1.3 still owns ISBN split; this story only changes derived short form.
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-1-4-author-honorifics.md`
+  summary: Hermes locate is not newly tested for abbreviation search (`BHB`).
+  evidence: Catalog `GET /books?q=BHB` is covered; locate uses the same `Book.author` ILIKE but has no honorific-specific assertion.
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-1-4-author-honorifics.md`
+  summary: Honorific list editor has no search/grouping for the ~70-row seed and no Vue mount tests.
+  evidence: Same repo-wide missing-component-runner gap as 1.2 and language-filter reviews.
+
 ## Deferred from: code review of spec-catalog-language-filter.md (2026-08-31)
 
 - source_spec: `/Users/davinderpalrehal/Projects/pothi-parivaar/_bmad-output/implementation-artifacts/spec-catalog-language-filter.md`

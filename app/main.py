@@ -5,7 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
-from app.api import books, readers, locations, isbn, hermes
+from app.api import books, readers, locations, isbn, hermes, honorifics
 from app.config import settings, STATIC_DIR
 from app.database import init_db
 from app.models import HealthResponse
@@ -45,6 +45,7 @@ def health_check() -> HealthResponse:
 app.include_router(books.router, prefix="/api/v1")
 app.include_router(readers.router, prefix="/api/v1")
 app.include_router(locations.router, prefix="/api/v1")
+app.include_router(honorifics.router, prefix="/api/v1")
 app.include_router(isbn.router, prefix="/api/v1")
 app.include_router(hermes.router, prefix="/api/v1")
 
@@ -52,6 +53,7 @@ app.include_router(hermes.router, prefix="/api/v1")
 app.include_router(books.router, prefix="/api")
 app.include_router(readers.router, prefix="/api")
 app.include_router(locations.router, prefix="/api")
+app.include_router(honorifics.router, prefix="/api")
 app.include_router(isbn.router, prefix="/api")
 app.include_router(hermes.router, prefix="/api")
 

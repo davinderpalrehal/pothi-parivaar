@@ -1,10 +1,11 @@
 """Split and display rules for author strings (name-rules.md)."""
 
 from dataclasses import dataclass
-from typing import Optional
+from typing import Literal, Optional, Sequence
 
 
 MONONYM_LAST = " "
+HonorificRole = Literal["prefix", "suffix"]
 
 
 @dataclass(frozen=True)
@@ -12,6 +13,13 @@ class AuthorName:
     first_name: str
     last_name: str
     middle_name: Optional[str] = None
+
+
+@dataclass(frozen=True)
+class HonorificRule:
+    tokens: tuple[str, ...]
+    role: HonorificRole
+    abbreviation: str
 
 
 def split_author_string(raw: Optional[str]) -> list[AuthorName]:
@@ -43,17 +51,123 @@ def split_author_string(raw: Optional[str]) -> list[AuthorName]:
     return authors
 
 
-def author_short_form(first_name: str, last_name: str) -> str:
-    """Catalog short form: ``D. Carnegie``, or the first name as-is for a mononym."""
-    if last_name == MONONYM_LAST:
-        return first_name
-    if not first_name:
-        return last_name
-    return f"{first_name[0]}. {last_name}"
+def _space_tokens(value: Optional[str]) -> list[str]:
+    if not value:
+        return []
+    return [token for token in value.split(" ") if token]
 
 
-def joined_short_forms(names: list[AuthorName]) -> str:
+def reconstruct_tokens(first_name: str, last_name: str, middle_name: Optional[str] = None) -> list[str]:
+    tokens = _space_tokens(first_name) + _space_tokens(middle_name)
+    if last_name != MONONYM_LAST:
+        tokens.extend(_space_tokens(last_name))
+    return tokens
+
+
+def _norm_token(token: str) -> str:
+    stripped = token.strip().lower()
+    if stripped.endswith("."):
+        stripped = stripped[:-1]
+    return stripped
+
+
+def _tokens_match(sequence: Sequence[str], start: int, honorific_tokens: Sequence[str]) -> bool:
+    count = len(honorific_tokens)
+    if start < 0 or start + count > len(sequence):
+        return False
+    return all(
+        _norm_token(sequence[start + index]) == _norm_token(honorific_tokens[index])
+        for index in range(count)
+    )
+
+
+def _peel_honorifics(
+    tokens: list[str], honorifics: Sequence[HonorificRule]
+) -> tuple[list[str], list[str], list[str]]:
+    remaining = list(tokens)
+    prefix_abbrevs: list[str] = []
+    suffix_abbrevs: list[str] = []
+    enabled = [rule for rule in honorifics if rule.tokens]
+    prefixes = sorted(
+        [rule for rule in enabled if rule.role == "prefix"],
+        key=lambda rule: len(rule.tokens),
+        reverse=True,
+    )
+    suffixes = sorted(
+        [rule for rule in enabled if rule.role == "suffix"],
+        key=lambda rule: len(rule.tokens),
+        reverse=True,
+    )
+
+    while remaining:
+        matched = False
+        for rule in prefixes:
+            if _tokens_match(remaining, 0, rule.tokens):
+                remaining = remaining[len(rule.tokens) :]
+                if rule.abbreviation:
+                    prefix_abbrevs.append(rule.abbreviation)
+                matched = True
+                break
+        if matched:
+            continue
+        for rule in suffixes:
+            start = len(remaining) - len(rule.tokens)
+            if _tokens_match(remaining, start, rule.tokens):
+                remaining = remaining[:start]
+                if rule.abbreviation:
+                    suffix_abbrevs.append(rule.abbreviation)
+                matched = True
+                break
+        if not matched:
+            break
+    suffix_abbrevs.reverse()
+    return remaining, prefix_abbrevs, suffix_abbrevs
+
+
+def _join_parts(*parts: Sequence[str] | str) -> str:
+    tokens: list[str] = []
+    for part in parts:
+        if isinstance(part, str):
+            if part:
+                tokens.append(part)
+        else:
+            tokens.extend(token for token in part if token)
+    return " ".join(tokens)
+
+
+def author_short_form(
+    first_name: str,
+    last_name: str,
+    middle_name: Optional[str] = None,
+    honorifics: Optional[Sequence[HonorificRule]] = None,
+) -> str:
+    """Catalog short form including peeled honorifics (name-rules.md)."""
+    rules = list(honorifics or [])
+    reconstructed = reconstruct_tokens(first_name, last_name, middle_name)
+    personal, prefixes, suffixes = _peel_honorifics(reconstructed, rules)
+
+    if not personal:
+        return _join_parts(prefixes, suffixes) or first_name
+
+    if last_name == MONONYM_LAST and len(personal) == 1:
+        core = personal[0]
+    else:
+        core = f"{personal[0][0]}. {personal[-1]}" if personal[0] else personal[-1]
+
+    return _join_parts(prefixes, core, suffixes)
+
+
+def joined_short_forms(
+    names: list[AuthorName],
+    honorifics: Optional[Sequence[HonorificRule]] = None,
+) -> str:
     """Comma-separated short forms in the given order."""
     return ", ".join(
-        author_short_form(name.first_name, name.last_name) for name in names
+        author_short_form(
+            name.first_name,
+            name.last_name,
+            name.middle_name,
+            honorifics,
+        )
+        for name in names
     )
